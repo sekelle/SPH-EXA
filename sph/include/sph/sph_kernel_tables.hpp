@@ -120,9 +120,9 @@ struct SincN1SincN2
 
     T kernel(T x) const
     {
-        return a / K1 * std::pow(wharmonic_std(x), n1) + (1 - a) / K2 * std::pow(wharmonic_std(x), n2);
+        return a * K1 * std::pow(wharmonic_std(x), n1) + (1 - a) * K2 * std::pow(wharmonic_std(x), n2);
     }
-    T derivative(T x) const { return a / K1 * powSincDerivative(x, n1) + (1 - a) / K2 * powSincDerivative(x, n2); }
+    T derivative(T x) const { return a * K1 * powSincDerivative(x, n1) + (1 - a) * K2 * powSincDerivative(x, n2); }
 
     T a  = 0.9;
     T n1 = 4.0;
