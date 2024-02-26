@@ -120,18 +120,18 @@ HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
     {
         auto nodeCenter = centers[idx];
         auto nodeSize   = sizes[idx];
-        return norm2(minDistance(particle, nodeCenter, nodeSize, box)) < radiusSq;
+        return norm2(minDistance(particle, nodeCenter, nodeSize, box)) < radiusSq * 1.5;
     };
 
     auto overlaps = [particle, radiusSq, centers = tree.centers, sizes = tree.sizes](TreeNodeIndex idx)
     {
         auto nodeCenter = centers[idx];
         auto nodeSize   = sizes[idx];
-        return norm2(minDistance(particle, nodeCenter, nodeSize)) < radiusSq;
+        return norm2(minDistance(particle, nodeCenter, nodeSize)) < radiusSq * 1.5;
     };
 
     auto searchBoxPbc =
-        [i, particle, radiusSq, &tree, x, y, z, ngmax, neighbors, &numNeighbors, &box](TreeNodeIndex idx)
+        [i, particle, radiusSq, &tree, x, y, z, h, ngmax, neighbors, &numNeighbors, &box](TreeNodeIndex idx)
     {
         TreeNodeIndex leafIdx    = tree.internalToLeaf[idx];
         LocalIndex firstParticle = tree.layout[leafIdx];
@@ -140,7 +140,8 @@ HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
         for (LocalIndex j = firstParticle; j < lastParticle; ++j)
         {
             if (j == i) { continue; }
-            if (distanceSq<true>(x[j], y[j], z[j], particle[0], particle[1], particle[2], box) < radiusSq)
+            Th Rij = std::max(radiusSq, Th(4) * h[j] * h[j]);
+            if (distanceSq<true>(x[j], y[j], z[j], particle[0], particle[1], particle[2], box) < Rij)
             {
                 if (numNeighbors < ngmax) { neighbors[numNeighbors] = j; }
                 numNeighbors++;
@@ -148,7 +149,7 @@ HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
         }
     };
 
-    auto searchBox = [i, particle, radiusSq, &tree, x, y, z, ngmax, neighbors, &numNeighbors, &box](TreeNodeIndex idx)
+    auto searchBox = [i, particle, radiusSq, &tree, x, y, z, h, ngmax, neighbors, &numNeighbors, &box](TreeNodeIndex idx)
     {
         TreeNodeIndex leafIdx    = tree.internalToLeaf[idx];
         LocalIndex firstParticle = tree.layout[leafIdx];
@@ -157,7 +158,8 @@ HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
         for (LocalIndex j = firstParticle; j < lastParticle; ++j)
         {
             if (j == i) { continue; }
-            if (distanceSq<false>(x[j], y[j], z[j], particle[0], particle[1], particle[2], box) < radiusSq)
+            Th Rij = std::max(radiusSq, Th(4) * h[j] * h[j]);
+            if (distanceSq<false>(x[j], y[j], z[j], particle[0], particle[1], particle[2], box) < Rij)
             {
                 if (numNeighbors < ngmax) { neighbors[numNeighbors] = j; }
                 numNeighbors++;
