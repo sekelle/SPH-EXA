@@ -33,7 +33,15 @@ void findNeighborsSph(const Tc* x, const Tc* y, const Tc* z, T* h, LocalIndex fi
         }
         numFails += (iteration >= maxIteration);
 
-        nc[i] = ncSph;
+        //nc[i] = ncSph;
+    }
+
+#pragma omp parallel for
+    for (LocalIndex i = 0; i < numWork; ++i)
+    {
+        LocalIndex id    = i + firstId;
+        unsigned   ncSph = 1 + findNeighbors(id, x, y, z, h, treeView, box, ngmax, neighbors + i * ngmax, true);
+        nc[i]            = ncSph;
     }
 
     if (numFails)
