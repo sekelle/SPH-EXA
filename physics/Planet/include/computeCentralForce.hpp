@@ -10,42 +10,56 @@
 #include <mpi.h>
 #include "cstone/primitives/mpi_wrappers.hpp"
 #include "cstone/fields/field_get.hpp"
+#include "cstone/tree/accel_switch.hpp"
+#include "cstone/cuda/cuda_stubs.h"
+
+#include "planet_gpu.hpp"
 
 namespace planet
 {
+
 template<typename Dataset, typename StarData>
 void computeCentralForce(Dataset& d, size_t startIndex, size_t endIndex, StarData& star)
 {
-    // std::array<double, 3> f_tot{};
-    star.force_local = {0., 0., 0.};
-    // Potential energy coming from interaction with star
-    // double pot_star = 0.;
-    star.potential_local = 0.;
-
-    for (size_t i = startIndex; i < endIndex; i++)
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        const double x     = d.x[i] - star.position[0];
-        const double y     = d.y[i] - star.position[1];
-        const double z     = d.z[i] - star.position[2];
-        const double dist2 = x * x + y * y + z * z;
-        const double dist  = std::sqrt(dist2);
-        const double dist3 = dist2 * dist;
-
-        // Assume stellar mass is 1 and G = 1.
-        const double a_strength = 1. / dist3 * star.m * d.g;
-        const double ax         = -x * a_strength;
-        const double ay         = -y * a_strength;
-        const double az         = -z * a_strength;
-        d.ax[i] += ax;
-        d.ay[i] += ay;
-        d.az[i] += az;
-
-        star.force_local[0] -= ax * d.m[i];
-        star.force_local[1] -= ay * d.m[i];
-        star.force_local[2] -= az * d.m[i];
-        star.potential_local -= d.g * d.m[i] / dist;
+        computeCentralForceGPU(startIndex, endIndex, rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z),
+                               rawPtr(d.devData.ax), rawPtr(d.devData.ay), rawPtr(d.devData.az), rawPtr(d.devData.m),
+                               star.position.data(), star.m, star.force_local.data(), &star.potential_local, d.g);
     }
-    // return std::make_tuple(pot_star, f_tot);
+    else
+    {
+        // std::array<double, 3> f_tot{};
+        star.force_local = {0., 0., 0.};
+        // Potential energy coming from interaction with star
+        // double pot_star = 0.;
+        star.potential_local = 0.;
+
+        for (size_t i = startIndex; i < endIndex; i++)
+        {
+            const double x     = d.x[i] - star.position[0];
+            const double y     = d.y[i] - star.position[1];
+            const double z     = d.z[i] - star.position[2];
+            const double dist2 = x * x + y * y + z * z;
+            const double dist  = std::sqrt(dist2);
+            const double dist3 = dist2 * dist;
+
+            // Assume stellar mass is 1 and G = 1.
+            const double a_strength = 1. / dist3 * star.m * d.g;
+            const double ax         = -x * a_strength;
+            const double ay         = -y * a_strength;
+            const double az         = -z * a_strength;
+            d.ax[i] += ax;
+            d.ay[i] += ay;
+            d.az[i] += az;
+
+            star.force_local[0] -= ax * d.m[i];
+            star.force_local[1] -= ay * d.m[i];
+            star.force_local[2] -= az * d.m[i];
+            star.potential_local -= d.g * d.m[i] / dist;
+        }
+        // return std::make_tuple(pot_star, f_tot);
+    }
 }
 
 template<typename StarData>

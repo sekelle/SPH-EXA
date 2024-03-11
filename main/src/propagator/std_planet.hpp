@@ -173,7 +173,7 @@ public:
 
         computeForces(domain, simData);
 
-        planet::betaCooling(d, first, last, star.position, 6.28);
+        //planet::betaCooling(d, first, last, star.position, 6.28);
         timer.step("betaCooling");
 
         planet::computeCentralForce(simData.hydro, first, last, star);
@@ -189,7 +189,7 @@ public:
         updateSmoothingLength(first, last, d);
         timer.step("UpdateQuantities");
 
-        planet::accreteParticles<ConservedFields>(d, domain, star, 100.);
+        //planet::accreteParticles<ConservedFields>(d, domain, star, 100.);
         timer.step("accreteParticles");
 
         printf("star position: %lf\t%lf\t%lf\n", star.position[0], star.position[1], star.position[2]);
