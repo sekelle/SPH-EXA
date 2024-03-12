@@ -162,14 +162,17 @@ public:
         timer.step("domain::sync");
 
         auto& d = simData.hydro;
+        domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
+
+
         d.resize(domain.nParticlesWithHalos());
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
         // fill mass halos under the assumption that all particles have equal masses
-        transferToHost(d, first, first + 1, {"m"});
-        fill(get<"m">(d), 0, first, d.m[first]);
-        fill(get<"m">(d), last, domain.nParticlesWithHalos(), d.m[first]);
+        //transferToHost(d, first, first + 1, {"m"});
+        //fill(get<"m">(d), 0, first, d.m[first]);
+        //fill(get<"m">(d), last, domain.nParticlesWithHalos(), d.m[first]);
 
         computeForces(domain, simData);
 
@@ -189,13 +192,20 @@ public:
         updateSmoothingLength(first, last, d);
         timer.step("UpdateQuantities");
 
-        //planet::accreteParticles<ConservedFields>(d, domain, star, 100.);
+        using KeyType = typename DataType::HydroData::KeyType;
+        fill(get<"keys">(d), first, last, KeyType{0});
+
+        planet::accreteParticles<util::FuseValueList<FieldList<"x", "y", "z", "h", "m">, ConservedFields>>(d, domain, star, 100.);
         timer.step("accreteParticles");
 
-        printf("star position: %lf\t%lf\t%lf\n", star.position[0], star.position[1], star.position[2]);
-        printf("star mass: %lf\n", star.m);
-        printf("additional pot. erg.: %lf\n", star.potential);
-
+        int rank = 0;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        if (rank == 0)
+        {
+            printf("star position: %lf\t%lf\t%lf\n", star.position[0], star.position[1], star.position[2]);
+            printf("star mass: %lf\n", star.m);
+            printf("additional pot. erg.: %lf\n", star.potential);
+        }
     }
 
     void saveFields(IFileWriter* writer, size_t first, size_t last, DataType& simData,

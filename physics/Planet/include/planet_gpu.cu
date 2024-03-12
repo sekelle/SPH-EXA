@@ -60,10 +60,16 @@ __global__ void computeCentralForceGPUKernel(size_t first, size_t last, const T1
     BlockReduce reduce2(temp_storage2);
     BlockReduce reduce3(temp_storage3);
 
-    star_force_block0[blockIdx.x]    = reduce0.Reduce(star_force_thread[0], cub::Sum());
-    star_force_block1[blockIdx.x]    = reduce1.Reduce(star_force_thread[1], cub::Sum());
-    star_force_block2[blockIdx.x]    = reduce2.Reduce(star_force_thread[2], cub::Sum());
-    star_potential_block[blockIdx.x] = reduce3.Reduce(star_potential_thread, cub::Sum());
+    double star_force_reduced0    = reduce0.Reduce(star_force_thread[0], cub::Sum());
+    double star_force_reduced1    = reduce1.Reduce(star_force_thread[1], cub::Sum());
+    double star_force_reduced2    = reduce2.Reduce(star_force_thread[2], cub::Sum());
+    double star_potential_reduced = reduce3.Reduce(star_potential_thread, cub::Sum());
+
+    // star_force_block0[blockIdx.x]
+    //     star_force_block1[blockIdx.x]
+    //     star_force_block2[blockIdx.x]
+    //     star_potential_block[blockIdx.x]
+    //
 
     // double           star_force_block0 = reduce0.Reduce(star_force_thread[0], cub::Sum());
     // double           star_force_block1 = reduce1.Reduce(star_force_thread[1], cub::Sum());
@@ -74,7 +80,12 @@ __global__ void computeCentralForceGPUKernel(size_t first, size_t last, const T1
 
     if (threadIdx.x == 0)
     {
-        if (blockIdx.x == 0)
+        star_force_block0[blockIdx.x]    = star_force_reduced0;
+        star_force_block1[blockIdx.x]    = star_force_reduced1;
+        star_force_block2[blockIdx.x]    = star_force_reduced2;
+        star_potential_block[blockIdx.x] = star_potential_reduced;
+
+        /*if (blockIdx.x == 0)
         {
             for (size_t i = 1; i < blockDim.x; i++)
             {
@@ -84,7 +95,8 @@ __global__ void computeCentralForceGPUKernel(size_t first, size_t last, const T1
                 star_force_block2[0] += star_force_block2[i];
                 star_potential_block[0] += star_potential_block[i];
             }
-        }
+        }*/
+
         // atomicSum(&star_force_device[0], star_force_block0);
         /*atomicSum(&star_force_device[1], star_force_block1);
         atomicSum(&star_force_device[2], star_force_block2);
@@ -108,14 +120,14 @@ void computeCentralForceGPU(size_t first, size_t last, const T1* x, const T1* y,
     // checkGpuErrors(cudaMemcpyToSymbol(star_force_device, sf, sizeof *sf * 3));
     // checkGpuErrors(cudaMemcpyToSymbol(star_potential_device, sf, sizeof *spot));
 
-    double* star_force_block0;
-    cudaMalloc(&star_force_block0, sizeof(double) * numBlocks);
-    double* star_force_block1;
-    cudaMalloc(&star_force_block1, sizeof(double) * numBlocks);
-    double* star_force_block2;
-    cudaMalloc(&star_force_block2, sizeof(double) * numBlocks);
-    double* star_potential_block;
-    cudaMalloc(&star_potential_block, sizeof(double) * numBlocks);
+    T2* star_force_block0;
+    cudaMalloc(&star_force_block0, sizeof(T2) * numBlocks);
+    T2* star_force_block1;
+    cudaMalloc(&star_force_block1, sizeof(T2) * numBlocks);
+    T2* star_force_block2;
+    cudaMalloc(&star_force_block2, sizeof(T2) * numBlocks);
+    T2* star_potential_block;
+    cudaMalloc(&star_potential_block, sizeof(T2) * numBlocks);
 
     computeCentralForceGPUKernel<<<numBlocks, numThreads>>>(first, last, x, y, z, ax, ay, az, m, spos[0], spos[1],
                                                             spos[2], sm, G, star_force_block0, star_force_block1,
@@ -124,16 +136,24 @@ void computeCentralForceGPU(size_t first, size_t last, const T1* x, const T1* y,
     // checkGpuErrors(cudaMemcpyFromSymbol(sf, star_force_device, (sizeof *sf) * 3));
     // checkGpuErrors(cudaMemcpyFromSymbol(spot, &star_potential_device, sizeof *spot));
 
-    checkGpuErrors(cudaMemcpy(sf, star_force_block0, (sizeof *sf), cudaMemcpyDeviceToHost));
-    checkGpuErrors(cudaMemcpy(sf + 1, star_force_block1, (sizeof *sf), cudaMemcpyDeviceToHost));
-    checkGpuErrors(cudaMemcpy(sf + 2, star_force_block2, (sizeof *sf), cudaMemcpyDeviceToHost));
-    checkGpuErrors(cudaMemcpy(spot, star_potential_block, (sizeof *sf), cudaMemcpyDeviceToHost));
+    sf[0] = thrust::reduce(thrust::device_ptr<T2>(star_force_block0),
+                           thrust::device_ptr<T2>(star_force_block0) + numBlocks, 0., thrust::plus<T2>{});
+    sf[1] = thrust::reduce(thrust::device_ptr<T2>(star_force_block1),
+                           thrust::device_ptr<T2>(star_force_block1) + numBlocks, 0., thrust::plus<T2>{});
+    sf[2] = thrust::reduce(thrust::device_ptr<T2>(star_force_block2),
+                           thrust::device_ptr<T2>(star_force_block2) + numBlocks, 0., thrust::plus<T2>{});
+    *spot = thrust::reduce(thrust::device_ptr<T2>(star_potential_block),
+                           thrust::device_ptr<T2>(star_potential_block) + numBlocks, 0., thrust::plus<T2>{});
 
+    // checkGpuErrors(cudaMemcpy(sf, star_force_block0, (sizeof *sf), cudaMemcpyDeviceToHost));
+    // checkGpuErrors(cudaMemcpy(sf + 1, star_force_block1, (sizeof *sf), cudaMemcpyDeviceToHost));
+    // checkGpuErrors(cudaMemcpy(sf + 2, star_force_block2, (sizeof *sf), cudaMemcpyDeviceToHost));
+    // checkGpuErrors(cudaMemcpy(spot, star_potential_block, (sizeof *spot), cudaMemcpyDeviceToHost));
 
-    //checkGpuErrors(cudaMemcpyFromSymbol(sf, star_force_block0, (sizeof *sf)));
-    //checkGpuErrors(cudaMemcpyFromSymbol(sf + 1, star_force_block0, (sizeof *sf)));
-    //checkGpuErrors(cudaMemcpyFromSymbol(sf + 2, star_force_block0, (sizeof *sf)));
-    //checkGpuErrors(cudaMemcpyFromSymbol(spot, star_potential_block, sizeof *spot));
+    // checkGpuErrors(cudaMemcpyFromSymbol(sf, star_force_block0, (sizeof *sf)));
+    // checkGpuErrors(cudaMemcpyFromSymbol(sf + 1, star_force_block0, (sizeof *sf)));
+    // checkGpuErrors(cudaMemcpyFromSymbol(sf + 2, star_force_block0, (sizeof *sf)));
+    // checkGpuErrors(cudaMemcpyFromSymbol(spot, star_potential_block, sizeof *spot));
 
     cudaFree(star_force_block0);
     cudaFree(star_force_block1);
