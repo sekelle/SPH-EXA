@@ -15,6 +15,7 @@
 #include "exchangeStellarPosition.hpp"
 #include "computeCentralForce.hpp"
 #include "star_data.hpp"
+#include "accretion.hpp"
 
 #include "ipropagator.hpp"
 #include "gravity_wrapper.hpp"
@@ -81,7 +82,6 @@ public:
             reader->closeStep();
             printf("star position: %lf\t%lf\t%lf\n", star.position[0], star.position[1], star.position[2]);
             printf("star mass: %lf\n", star.m);
-
         }
     }
     void save(IFileWriter* writer) override { star.loadOrStoreAttributes(writer); }
@@ -164,19 +164,18 @@ public:
         auto& d = simData.hydro;
         domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
 
-
         d.resize(domain.nParticlesWithHalos());
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
         // fill mass halos under the assumption that all particles have equal masses
-        //transferToHost(d, first, first + 1, {"m"});
-        //fill(get<"m">(d), 0, first, d.m[first]);
-        //fill(get<"m">(d), last, domain.nParticlesWithHalos(), d.m[first]);
+        // transferToHost(d, first, first + 1, {"m"});
+        // fill(get<"m">(d), 0, first, d.m[first]);
+        // fill(get<"m">(d), last, domain.nParticlesWithHalos(), d.m[first]);
 
         computeForces(domain, simData);
 
-        //planet::betaCooling(d, first, last, star.position, 6.28);
+        // planet::betaCooling(d, first, last, star.position, 6.28);
         timer.step("betaCooling");
 
         planet::computeCentralForce(simData.hydro, first, last, star);
@@ -195,11 +194,21 @@ public:
         using KeyType = typename DataType::HydroData::KeyType;
         fill(get<"keys">(d), first, last, KeyType{0});
 
-        planet::accreteParticles<util::FuseValueList<FieldList<"x", "y", "z", "h", "m">, ConservedFields>>(d, domain, star, 100.);
-        timer.step("accreteParticles");
-
         int rank = 0;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        planet::computeAccretionCondition(first, last, d, star);
+
+        using ActiveFields = util::FuseValueList<FieldList<"x", "y", "z", "h", "m">, ConservedFields>;
+        planet::moveAccretedToEnd<ActiveFields>(first, last, d, star);
+
+        planet::sumAccretedMassAndMomentum(first, last, d, star);
+
+        // Send to ranks
+        planet::exchangeAndAccreteOnStar(star, d.minDt_m1, rank);
+
+        domain.setEndIndex(last - star.n_accreted);
+        timer.step("accreteParticles");
+
         if (rank == 0)
         {
             printf("star position: %lf\t%lf\t%lf\n", star.position[0], star.position[1], star.position[2]);
