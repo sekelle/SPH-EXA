@@ -12,5 +12,8 @@ template<typename Tv, typename Tm, typename Tstar>
 void sumMassAndMomentumGPU(size_t sum_first, size_t sum_last, const Tv* vx, const Tv* vy, const Tv* vz, const Tm* m,
                            Tstar* m_sum, Tstar* p_sum);
 
-template<typename T1, typename Tremove>
-void moveAccretedToEndGPU(size_t first, size_t last, T1* x, Tremove* remove, size_t* n_removed);
+template<typename Torder>
+void computeNewOrderGPU(size_t first, size_t last, Torder* order, size_t* n_removed);
+
+template<typename T, typename Torder>
+void applyNewOrderGPU(size_t first, size_t last, T* x, T* scratch, Torder* order);

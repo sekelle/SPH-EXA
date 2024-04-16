@@ -8,6 +8,7 @@
 #include <execution>
 #include <numeric>
 #include <vector>
+#include <iostream>
 
 namespace planet
 {
@@ -25,17 +26,32 @@ void computeAccretionConditionImpl(size_t first, size_t last, const T1* x, const
         const double dz    = z[i] - spos[2];
         const double dist2 = dx * dx + dy * dy + dz * dz;
 
-        if (dist2 < star_size2) remove[i] = 1;
+        if (dist2 < star_size2) { remove[i] = 1; }
     }
 }
 
-template<typename T1, typename Tremove>
-void moveAccretedToEndImpl(size_t first, size_t last, T1* x, Tremove* remove, size_t* n_removed)
+template<typename Tremove>
+void computeNewOrderImpl(size_t first, size_t last, Tremove* remove, size_t* n_removed)
 {
+    std::vector<size_t> index(last - first);
+    std::iota(index.begin(), index.end(), first);
 
-    auto sort_by_removal      = [r = remove + first, x_first = x + first](T1& x_i) { return (r[&x_i - x_first] == 0); };
-    const auto* partition_ptr = std::stable_partition(x + first, x + last, sort_by_removal);
-    *n_removed                = (x + last) - partition_ptr;
+    auto       sort_by_removal    = [remove](size_t i) { return (remove[i] == 0); };
+    const auto partition_iterator = std::stable_partition(index.begin(), index.end(), sort_by_removal);
+    *n_removed                    = index.end() - partition_iterator;
+
+    std::copy(index.begin(), index.end(), remove + first);
+}
+
+template<typename T1, typename Tremove>
+void applyNewOrderImpl(size_t first, size_t last, T1* x, T1* scratch, Tremove* order)
+{
+    for (size_t i = 0; i < last - first; i++)
+    {
+        scratch[i + first] = x[order[i + first]];
+    }
+
+    std::copy(scratch + first, scratch + last, x + first);
 }
 
 template<typename Tv, typename Tm, typename Tstar>
@@ -46,15 +62,14 @@ void sumMassAndMomentumImpl(size_t sum_first, size_t sum_last, const Tv* vx, con
     std::vector<Tv> py(sum_last - sum_first);
     std::vector<Tv> pz(sum_last - sum_first);
 
-    std::transform(std::execution::par, vx + sum_first, vx + sum_last, m + sum_first, px.begin(),
-                   std::multiplies<Tv>{});
+    std::transform(vx + sum_first, vx + sum_last, m + sum_first, px.begin(), std::multiplies<Tv>{});
     std::transform(vy + sum_first, vy + sum_last, m + sum_first, py.begin(), std::multiplies<Tv>{});
     std::transform(vz + sum_first, vz + sum_last, m + sum_first, pz.begin(), std::multiplies<Tv>{});
 
-    p_sum[0] = std::accumulate(px.begin(), px.end(), 0.);
-    p_sum[1] = std::accumulate(py.begin(), py.end(), 0.);
-    p_sum[2] = std::accumulate(pz.begin(), pz.end(), 0.);
-
+    p_sum[0] = std::accumulate(px.begin(), px.end(), Tv{0.});
+    p_sum[1] = std::accumulate(py.begin(), py.end(), Tv{0.});
+    p_sum[2] = std::accumulate(pz.begin(), pz.end(), Tv{0.});
+    std::cout << "sumMass " << p_sum[0] << std::endl;
     *m_sum = std::accumulate(m + sum_first, m + sum_last, 0.);
 }
 } // namespace planet

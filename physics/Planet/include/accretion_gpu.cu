@@ -30,7 +30,7 @@ __global__ void computeAccretionConditionKernel(size_t first, size_t last, const
 
 template<typename T1, typename Tremove, typename T2>
 void computeAccretionConditionGPU(size_t first, size_t last, const T1* x, const T1* y, const T1* z, Tremove* remove,
-                               const T2* spos, T2 star_size)
+                                  const T2* spos, T2 star_size)
 {
     cstone::LocalIndex numParticles = last - first;
     unsigned           numThreads   = 256;
@@ -42,12 +42,13 @@ void computeAccretionConditionGPU(size_t first, size_t last, const T1* x, const 
 }
 
 template void computeAccretionConditionGPU(size_t, size_t, const double*, const double*, const double*, uint64_t*,
-                                        const double*, double);
+                                           const double*, double);
 struct is_zero
 {
     __device__ bool operator()(const uint64_t& k) { return (k == 0); }
 };
 
+/*
 template<typename T1, typename Tremove>
 void moveAccretedToEndGPU(size_t first, size_t last, T1* x, Tremove* remove, size_t* n_removed)
 {
@@ -58,6 +59,35 @@ void moveAccretedToEndGPU(size_t first, size_t last, T1* x, Tremove* remove, siz
 
 template void moveAccretedToEndGPU(size_t, size_t, double*, uint64_t*, size_t*);
 template void moveAccretedToEndGPU(size_t, size_t, float*, uint64_t*, size_t*);
+*/
+
+template<typename Torder>
+void computeNewOrderGPU(size_t first, size_t last, Torder* order, size_t* n_removed)
+{
+    thrust::vector<size_t> index(last - first);
+    thrust::iota(index.begin(), index.end(), first);
+    const auto partition_iterator = thrust::stable_partition(index.begin(), index.end(), is_zero{});
+    *n_removed                    = index.end() - partition_iterator;
+    // mgl. thrust::device
+    thrust::copy(thrust::device, index.begin(), index.end(), order.begin() + first);
+}
+template void computeNewOrderGPU(size_t, size_t, double*, size_t*);
+template void computeNewOrderGPU(size_t, size_t, float*, size_t*);
+
+template<typename T>
+struct index_access
+{
+    T*              x;
+    __device__ bool operator()(const size_t& k) { return (x[k]); }
+};
+template<typename T, typename Torder>
+void applyNewOrderGPU(size_t first, size_t last, T* x, T* scratch, Torder* order)
+{
+    thrust::transform(thrust::device, order + first, order + last, scratch + first, index_access{x});
+    thrust::copy(thrust::device, scratch + first, scratch + end, x + first);
+}
+template void applyNewOrderGPU(size_t, size_t, double*, double*, size_t*);
+template void applyNewOrderGPU(size_t, size_t, float*, float*, size_t*);
 
 template<typename Tv, typename Tm, typename Tstar>
 void sumMassAndMomentumGPU(size_t sum_first, size_t sum_last, const Tv* vx, const Tv* vy, const Tv* vz, const Tm* m,

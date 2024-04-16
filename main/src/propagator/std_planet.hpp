@@ -184,7 +184,9 @@ public:
         computeTimestep(first, last, d);
         timer.step("Timestep");
 
-        planet::computeAndExchangeStarPosition(star, d.minDt, d.minDt_m1);
+        int rank = 0;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        planet::computeAndExchangeStarPosition(star, d.minDt, d.minDt_m1, rank);
         timer.step("computeAndExchangeStarPosition");
 
         computePositions(first, last, d, domain.box());
@@ -194,8 +196,6 @@ public:
         using KeyType = typename DataType::HydroData::KeyType;
         fill(get<"keys">(d), first, last, KeyType{0});
 
-        int rank = 0;
-        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         planet::computeAccretionCondition(first, last, d, star);
 
         using ActiveFields = util::FuseValueList<FieldList<"x", "y", "z", "h", "m">, ConservedFields>;

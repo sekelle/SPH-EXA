@@ -66,15 +66,15 @@ void computeCentralForce(Dataset& d, size_t startIndex, size_t endIndex, StarDat
 }
 
 template<typename StarData>
-void computeAndExchangeStarPosition(StarData& star, double dt, double dt_m1)
+void computeAndExchangeStarPosition(StarData& star, double dt, double dt_m1, int rank)
 {
     std::array<double, 3> global_force{};
 
     MPI_Reduce(star.force_local.data(), global_force.data(), 3, MpiType<double>{}, MPI_SUM, 0, MPI_COMM_WORLD);
     MPI_Reduce(&star.potential_local, &star.potential, 1, MpiType<double>{}, MPI_SUM, 0, MPI_COMM_WORLD);
 
-    int rank = 0;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    //int rank = 0;
+    //MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     // printf("rank: %d total_force: %lf\t%lf\t%lf\n", rank, total_force[0],total_force[1],total_force[2]);
 
     // printf("rank: %d global_force: %lf\t%lf\t%lf\n", rank, global_force[0],global_force[1],global_force[2]);
@@ -111,31 +111,6 @@ void computeAndExchangeStarPosition(StarData& star, double dt, double dt_m1)
     MPI_Bcast(star.position.data(), 3, MpiType<double>{}, 0, MPI_COMM_WORLD);
     MPI_Bcast(star.position_m1.data(), 3, MpiType<double>{}, 0, MPI_COMM_WORLD);
 }
-
-//! @brief For Tuples A, B ... call f(a1, b1 ...), f(a2, b2 ...)
-template<typename... Tuples, typename F>
-requires(std::tuple_size_v<std::decay_t<Tuples>> == ...) void for_each_tuples(F&& f, Tuples&&... tuples)
-{
-    auto f_i = [&](auto I) { return f(std::get<I>(std::forward<Tuples>(tuples))...); };
-
-    auto iterate_each = [&f_i]<size_t... Is>(std::index_sequence<Is...>)
-    { (f_i(std::integral_constant<size_t, Is>{}), ...); };
-
-    constexpr size_t n_elements = std::min({std::tuple_size_v<std::decay_t<Tuples>>...});
-    iterate_each(std::make_index_sequence<n_elements>{});
-}
-
-/*reorderGPU(fieldPtr, orderPtr) {}
- */
-/*template<typename ActiveFields, typename Dataset, typename Domain, typename StarData>
-void accreteParticlesGPU(Dataset& d, Domain& domain, StarData& star, double r_outer = 25.)
-{
-
-}*/
-
-
-
-
 
 template<typename Dataset>
 void betaCooling(Dataset& d, size_t startIndex, size_t endIndex, const std::array<double, 3>& star_pos,
