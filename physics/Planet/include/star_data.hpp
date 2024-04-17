@@ -13,9 +13,7 @@ struct StarData
     std::array<double, 3> position_m1{};
     double                m{1.};
     double                inner_size{5.};
-
-    //! @brief Force exerted on star
-    // std::array<double, 3> force{};
+    double                beta{3.};
     //! @brief Potential from interaction between star and particles
     double potential{};
 
@@ -34,7 +32,7 @@ struct StarData
             {
                 if (ar->rank() == 0)
                 {
-                    std::cout << "Attribute cooling::" << attribute
+                    std::cout << "Attribute " << attribute
                               << " not set in file or initializer, setting to default value " << *location << std::endl;
                 }
             }
@@ -47,6 +45,8 @@ struct StarData
         optionalIO("star::y_m1", &position_m1[1], 1);
         optionalIO("star::z_m1", &position_m1[2], 1);
         optionalIO("star::m", &m, 1);
+        optionalIO("star::beta", &beta, 3.);
+        optionalIO("star::inner_size", &inner_size, 1);
     };
 
     // Local to Rank

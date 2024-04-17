@@ -66,8 +66,6 @@ struct AccretionTest : public ::testing::Test
         star.inner_size = inner_limit;
     }
 
-
-
     void initData()
     {
         data.setConserved("x", "y", "z", "h");
@@ -221,11 +219,11 @@ TEST_F(AccretionTest, testAccretion)
     planet::computeAccretionCondition(first, last, data, star);
     testComputeAccretionCondition();
 
-    planet::computeNewOrder<ConservedFields, DependentFields>(first, last, data, star);
+    planet::computeNewOrder(first, last, data, star);
     planet::applyNewOrder<ConservedFields, DependentFields>(first, last, data, star);
     testMoveAccretedToEnd();
 
-    planet::sumAccretedMassAndMomentum(first, last, data, star);
+    planet::sumAccretedMassAndMomentum<DependentFields>(first, last, data, star);
     testSumAccretedMassAndMomentum();
 
     planet::exchangeAndAccreteOnStar(star, dt, rank);

@@ -4,6 +4,7 @@
 #include "gtest/gtest.h"
 #include <mpi.h>
 #include "computeCentralForce.hpp"
+#include "exchangeStarPosition.hpp"
 #include "star_data.hpp"
 #include "sph/particles_data.hpp"
 #include "cstone/fields/field_get.hpp"
@@ -31,9 +32,7 @@ TEST_F(PlanetTest, testStarPosition)
     star.position    = {0., 1., 0.};
     star.position_m1 = {0., 0., 0.};
     star.force_local = {1., 0., 0.};
-    // std::array<double, 3> force{1., 0., 0.};
-    // std::array<double, 3> star_pos{0., 1., 0.};
-    // std::array<double, 3> star_pos_m1{0., 0., 0.};
+
     planet::computeAndExchangeStarPosition(star, 1., 1., rank);
     if (rank == 0)
     {

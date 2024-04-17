@@ -10,7 +10,7 @@ void computeAccretionConditionGPU(size_t first, size_t last, const T1* x, const 
 
 template<typename Tv, typename Tm, typename Tstar>
 void sumMassAndMomentumGPU(size_t sum_first, size_t sum_last, const Tv* vx, const Tv* vy, const Tv* vz, const Tm* m,
-                           Tstar* m_sum, Tstar* p_sum);
+                           Tv* scratch, Tstar* m_sum, Tstar* p_sum);
 
 template<typename Torder>
 void computeNewOrderGPU(size_t first, size_t last, Torder* order, size_t* n_removed);

@@ -12,10 +12,11 @@
 #include "cstone/fields/field_get.hpp"
 #include "sph/particles_data.hpp"
 #include "sph/sph.hpp"
-#include "exchangeStellarPosition.hpp"
+#include "exchangeStarPosition.hpp"
 #include "computeCentralForce.hpp"
 #include "star_data.hpp"
 #include "accretion.hpp"
+#include "betaCooling.hpp"
 
 #include "ipropagator.hpp"
 #include "gravity_wrapper.hpp"
@@ -162,9 +163,10 @@ public:
         timer.step("domain::sync");
 
         auto& d = simData.hydro;
-        domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
+        //domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
 
         d.resize(domain.nParticlesWithHalos());
+        domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
@@ -175,7 +177,7 @@ public:
 
         computeForces(domain, simData);
 
-        // planet::betaCooling(d, first, last, star.position, 6.28);
+        planet::betaCooling(d, first, last, star);
         timer.step("betaCooling");
 
         planet::computeCentralForce(simData.hydro, first, last, star);
@@ -184,29 +186,29 @@ public:
         computeTimestep(first, last, d);
         timer.step("Timestep");
 
+        computePositions(first, last, d, domain.box());
+        updateSmoothingLength(first, last, d);
+        timer.step("UpdateQuantities");
+
         int rank = 0;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         planet::computeAndExchangeStarPosition(star, d.minDt, d.minDt_m1, rank);
         timer.step("computeAndExchangeStarPosition");
 
-        computePositions(first, last, d, domain.box());
-        updateSmoothingLength(first, last, d);
-        timer.step("UpdateQuantities");
-
         using KeyType = typename DataType::HydroData::KeyType;
+
         fill(get<"keys">(d), first, last, KeyType{0});
 
         planet::computeAccretionCondition(first, last, d, star);
 
-        using ActiveFields = util::FuseValueList<FieldList<"x", "y", "z", "h", "m">, ConservedFields>;
-        planet::moveAccretedToEnd<ActiveFields>(first, last, d, star);
+        planet::computeNewOrder(first, last, d, star);
+        planet::applyNewOrder<ConservedFields, DependentFields>(first, last, d, star);
 
-        planet::sumAccretedMassAndMomentum(first, last, d, star);
-
-        // Send to ranks
+        planet::sumAccretedMassAndMomentum<DependentFields>(first, last, d, star);
         planet::exchangeAndAccreteOnStar(star, d.minDt_m1, rank);
 
         domain.setEndIndex(last - star.n_accreted);
+
         timer.step("accreteParticles");
 
         if (rank == 0)
@@ -215,6 +217,7 @@ public:
             printf("star mass: %lf\n", star.m);
             printf("additional pot. erg.: %lf\n", star.potential);
         }
+        printf("rank: %d, removed %zu\n", rank, star.n_accreted);
     }
 
     void saveFields(IFileWriter* writer, size_t first, size_t last, DataType& simData,

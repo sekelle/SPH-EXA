@@ -21,6 +21,7 @@
 namespace planet
 {
 
+//! @brief Flag particles for removal. Overwrites keys.
 template<typename Dataset, typename StarData>
 void computeAccretionCondition(size_t first, size_t last, Dataset& d, const StarData& star)
 {
@@ -36,11 +37,8 @@ void computeAccretionCondition(size_t first, size_t last, Dataset& d, const Star
     }
 }
 
-template<util::StructuralString exclude, typename Fields>
-using FieldListExclude_t = FieldListExclude<exclude, Fields>::value;
-
-//! @brief Keys should not be in conserved fields.
-template<typename ConservedFields, typename DependentFields, typename Dataset, typename StarData>
+//! @brief Compute new particle ordering with the particles to remove at the end. Overwrites keys.
+template<typename Dataset, typename StarData>
 void computeNewOrder(size_t first, size_t last, Dataset& d, StarData& star)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
@@ -50,19 +48,19 @@ void computeNewOrder(size_t first, size_t last, Dataset& d, StarData& star)
     else { computeNewOrderImpl(first, last, d.keys.data(), &star.n_accreted); }
 }
 
-//! @brief Keys should not be in conserved fields.
+//! @brief Apply the new particle ordering to all the conserved fields. Dependent fields are used as scratch buffer.
 template<typename ConservedFields, typename DependentFields, typename Dataset, typename StarData>
 void applyNewOrder(size_t first, size_t last, Dataset& d, StarData& star)
 {
-    using SortFields = decltype(util::FieldList<"x", "y", "z", "h">{} + ConservedFields{});
+    using SortFields = decltype(util::FieldList<"x", "y", "z", "h", "m">{} + ConservedFields{});
     auto sortVectors = get<SortFields>(d);
 
     using ScratchFields       = FieldListExclude_t<"keys", DependentFields>;
-    auto scratch_fields_tuple = [&d]()
+    auto scratch_fields_tuple = [&d]()// -> decltype(auto)
     {
         if constexpr (std::tuple_size_v<decltype(util::make_array(ScratchFields{}))> == 1)
         {
-            return std::make_tuple(get<ScratchFields>(d));
+            return std::tie(get<ScratchFields>(d));
         }
         else { return get<ScratchFields>(d); }
     };
@@ -81,24 +79,30 @@ void applyNewOrder(size_t first, size_t last, Dataset& d, StarData& star)
         sortVectors);
 }
 
-template<typename Dataset, typename StarData>
+//! @brief Compute total angular momentum and mass of the removed particles. Dependent Fields are used as scratch
+//! buffers.
+template<typename DependentFields, typename Dataset, typename StarData>
 void sumAccretedMassAndMomentum(size_t first, size_t last, Dataset& d, StarData& star)
 {
     if (star.n_accreted > (last - first)) throw std::runtime_error("Accreting more particles than on rank");
+    auto  scratchBuffers = get<DependentFields>(d);
+    auto& scratch        = util::pickType<std::decay_t<decltype(get<"vx">(d))>&>(scratchBuffers);
+
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
         sumMassAndMomentumGPU(last - star.n_accreted, last, rawPtr(get<"vx">(d)), rawPtr(get<"vy">(d)),
-                              rawPtr(get<"vz">(d)), rawPtr(get<"m">(d)), &star.m_accreted_local,
+                              rawPtr(get<"vz">(d)), rawPtr(get<"m">(d)), rawPtr(scratch), &star.m_accreted_local,
                               star.p_accreted_local.data());
     }
     else
     {
         sumMassAndMomentumImpl(last - star.n_accreted, last, get<"vx">(d).data(), get<"vy">(d).data(),
-                               get<"vz">(d).data(), get<"m">(d).data(), &star.m_accreted_local,
+                               get<"vz">(d).data(), get<"m">(d).data(), scratch.data(), &star.m_accreted_local,
                                star.p_accreted_local.data());
     }
 }
 
+//! @brief Exchange accreted mass and momentum between ranks and add to star.
 template<typename StarData>
 void exchangeAndAccreteOnStar(StarData& star, double minDt_m1, int rank)
 {
@@ -111,24 +115,20 @@ void exchangeAndAccreteOnStar(StarData& star, double minDt_m1, int rank)
 
     if (rank == 0)
     {
-        std::array<double, 3> momentum_star_old;
-        std::array<double, 3> momentum_star_new;
-        momentum_star_old[0] = (star.position_m1[0] / minDt_m1) * star.m;
-        momentum_star_old[1] = (star.position_m1[1] / minDt_m1) * star.m;
-        momentum_star_old[2] = (star.position_m1[2] / minDt_m1) * star.m;
-        momentum_star_new[0] = momentum_star_old[0] + p_accreted_global[0];
-        momentum_star_new[1] = momentum_star_old[1] + p_accreted_global[1];
-        momentum_star_new[2] = momentum_star_old[2] + p_accreted_global[2];
+        double m_star_new = m_accreted_global + star.m;
 
-        double m_new = m_accreted_global + star.m;
+        std::array<double, 3> p_star;
+        for (size_t i = 0; i < 3; i++)
+        {
+            p_star[i] = (star.position_m1[i] / minDt_m1) * star.m;
+            p_star[i] += p_accreted_global[i];
+            star.position_m1[i] = p_star[i] / m_star_new * minDt_m1;
+        }
 
-        star.position_m1[0] = momentum_star_new[0] / m_new * minDt_m1;
-        star.position_m1[1] = momentum_star_new[1] / m_new * minDt_m1;
-        star.position_m1[2] = momentum_star_new[2] / m_new * minDt_m1;
-
-        star.m = m_new;
+        star.m = m_star_new;
     }
     if (rank == 0) { printf("accreted mass: %g\tstar mass: %lf\n", m_accreted_global, star.m); }
+    if (rank == 0) { printf("accreted mass local: %g\n", star.m_accreted_local); }
 
     MPI_Bcast(star.position_m1.data(), 3, MpiType<double>{}, 0, MPI_COMM_WORLD);
     MPI_Bcast(&star.m, 1, MpiType<double>{}, 0, MPI_COMM_WORLD);

@@ -2,6 +2,7 @@
 // Created by Noah Kubli on 12.03.2024.
 //
 #include <cub/cub.cuh>
+#include <thrust/device_vector.h>
 
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/findneighbors.hpp"
@@ -15,18 +16,42 @@
 
 template<typename T1, typename Tremove, typename T2>
 __global__ void computeAccretionConditionKernel(size_t first, size_t last, const T1* x, const T1* y, const T1* z,
-                                                Tremove* remove, T2 star_x, T2 star_y, T2 star_z, T2 star_size2)
+                                                Tremove* remove, T2 star_x, T2 star_y, T2 star_z, T2 star_size2)//,
+                                                //unsigned* nrem_block)
 {
-    cstone::LocalIndex i = first + blockDim.x * blockIdx.x + threadIdx.x;
-    if (i >= last) { return; }
+    cstone::LocalIndex i    = first + blockDim.x * blockIdx.x + threadIdx.x;
+    //unsigned           nrem = 0;
 
-    const double dx    = x[i] - star_x;
-    const double dy    = y[i] - star_y;
-    const double dz    = z[i] - star_z;
-    const double dist2 = dx * dx + dy * dy + dz * dz;
+    if (i >= last)
+    { /*return; */
+    }
+    else
+    {
+        const double dx    = x[i] - star_x;
+        const double dy    = y[i] - star_y;
+        const double dz    = z[i] - star_z;
+        const double dist2 = dx * dx + dy * dy + dz * dz;
 
-    if (dist2 < star_size2) remove[i] = 1;
+        if (dist2 < star_size2)
+        {
+            remove[i] = 1;
+            //nrem      = 1;
+        }
+    }
+    //typedef cub::BlockReduce<unsigned, cstone::TravConfig::numThreads> BlockReduce;
+    //__shared__ typename BlockReduce::TempStorage                       temp_storage;
+
+    //BlockReduce reduce(temp_storage);
+
+    //unsigned nrem_reduced = reduce.Reduce(nrem, cub::Sum());
+    //__syncthreads();
+    //if (threadIdx.x == 0) { nrem_block[blockIdx.x] = nrem_reduced; }
 }
+
+struct debug_zero
+{
+    __device__ bool operator()(size_t x) const { return x == 1; }
+};
 
 template<typename T1, typename Tremove, typename T2>
 void computeAccretionConditionGPU(size_t first, size_t last, const T1* x, const T1* y, const T1* z, Tremove* remove,
@@ -36,92 +61,83 @@ void computeAccretionConditionGPU(size_t first, size_t last, const T1* x, const 
     unsigned           numThreads   = 256;
     unsigned           numBlocks    = (numParticles + numThreads - 1) / numThreads;
 
+
     computeAccretionConditionKernel<<<numBlocks, numThreads>>>(first, last, x, y, z, remove, spos[0], spos[1], spos[2],
                                                                star_size * star_size);
     checkGpuErrors(cudaGetLastError());
+    checkGpuErrors(cudaDeviceSynchronize());
+    size_t nrem = thrust::count_if(thrust::device, remove + first, remove + last, debug_zero{});
+    printf("computeAccretionConditionGPU remove : %u\n", nrem);
 }
 
 template void computeAccretionConditionGPU(size_t, size_t, const double*, const double*, const double*, uint64_t*,
                                            const double*, double);
+template<typename T>
 struct is_zero
 {
-    __device__ bool operator()(const uint64_t& k) { return (k == 0); }
+    const T*        arr;
+    __device__ bool operator()(const size_t& k) { return (arr[k] == 0); }
 };
 
-/*
-template<typename T1, typename Tremove>
-void moveAccretedToEndGPU(size_t first, size_t last, T1* x, Tremove* remove, size_t* n_removed)
+template<typename Tremove>
+void computeNewOrderGPU(size_t first, size_t last, Tremove* remove, size_t* n_removed)
 {
+    thrust::device_vector<size_t> index(last - first);
+    thrust::sequence(index.begin(), index.end(), first);
 
-    const auto* part_ptr = thrust::stable_partition(thrust::device, x + first, x + last, remove + first, is_zero{});
-    *n_removed           = (x + last) - part_ptr;
+    const auto partition_iterator = thrust::stable_partition(index.begin(), index.end(), is_zero<Tremove>{remove});
+    *n_removed                    = thrust::distance(partition_iterator, index.end());
+
+    thrust::copy(thrust::device, index.begin(), index.end(), remove + first);
+    checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void moveAccretedToEndGPU(size_t, size_t, double*, uint64_t*, size_t*);
-template void moveAccretedToEndGPU(size_t, size_t, float*, uint64_t*, size_t*);
-*/
-
-template<typename Torder>
-void computeNewOrderGPU(size_t first, size_t last, Torder* order, size_t* n_removed)
-{
-    thrust::vector<size_t> index(last - first);
-    thrust::iota(index.begin(), index.end(), first);
-    const auto partition_iterator = thrust::stable_partition(index.begin(), index.end(), is_zero{});
-    *n_removed                    = index.end() - partition_iterator;
-    // mgl. thrust::device
-    thrust::copy(thrust::device, index.begin(), index.end(), order.begin() + first);
-}
-template void computeNewOrderGPU(size_t, size_t, double*, size_t*);
-template void computeNewOrderGPU(size_t, size_t, float*, size_t*);
+template void computeNewOrderGPU(size_t, size_t, size_t*, size_t*);
 
 template<typename T>
 struct index_access
 {
-    T*              x;
-    __device__ bool operator()(const size_t& k) { return (x[k]); }
+    const T*     x;
+    __device__ T operator()(const size_t& k) { return (x[k]); }
 };
+
 template<typename T, typename Torder>
 void applyNewOrderGPU(size_t first, size_t last, T* x, T* scratch, Torder* order)
 {
-    thrust::transform(thrust::device, order + first, order + last, scratch + first, index_access{x});
-    thrust::copy(thrust::device, scratch + first, scratch + end, x + first);
+    thrust::transform(thrust::device, order + first, order + last, scratch + first, index_access<T>{x});
+    //checkGpuErrors(cudaDeviceSynchronize());
+    thrust::copy(thrust::device, scratch + first, scratch + last, x + first);
+    checkGpuErrors(cudaDeviceSynchronize());
 }
+
 template void applyNewOrderGPU(size_t, size_t, double*, double*, size_t*);
 template void applyNewOrderGPU(size_t, size_t, float*, float*, size_t*);
 
 template<typename Tv, typename Tm, typename Tstar>
-void sumMassAndMomentumGPU(size_t sum_first, size_t sum_last, const Tv* vx, const Tv* vy, const Tv* vz, const Tm* m,
-                           Tstar* m_sum, Tstar* p_sum)
+void sumMassAndMomentumGPU(size_t first, size_t last, const Tv* vx, const Tv* vy, const Tv* vz, const Tm* m,
+                           Tv* scratch, Tstar* m_sum, Tstar* p_sum)
 {
-    if (sum_first == sum_last)
+    if (first == last)
     {
         *m_sum   = 0.;
         p_sum[0] = 0.;
         p_sum[1] = 0.;
         p_sum[2] = 0.;
+        return;
     }
-    thrust::device_vector<Tv> px(sum_last - sum_first);
-    thrust::device_vector<Tv> py(sum_last - sum_first);
-    thrust::device_vector<Tv> pz(sum_last - sum_first);
 
-    thrust::copy(thrust::device, vx + sum_first, vx + sum_last, px.begin());
-    thrust::copy(thrust::device, vy + sum_first, vy + sum_last, py.begin());
-    thrust::copy(thrust::device, vz + sum_first, vz + sum_last, pz.begin());
+    thrust::transform(thrust::device, vx + first, vx + last, m + first, scratch + first, thrust::multiplies<Tv>{});
+    p_sum[0] = thrust::reduce(thrust::device, scratch + first, scratch + last, Tv{0.}, thrust::plus<Tv>{});
 
-    thrust::transform(px.begin(), px.end(), thrust::device_ptr<const Tm>(m) + sum_first, px.begin(),
-                      thrust::multiplies<Tv>{});
-    thrust::transform(py.begin(), py.end(), thrust::device_ptr<const Tm>(m) + sum_first, py.begin(),
-                      thrust::multiplies<Tv>{});
-    thrust::transform(pz.begin(), pz.end(), thrust::device_ptr<const Tm>(m) + sum_first, pz.begin(),
-                      thrust::multiplies<Tv>{});
+    thrust::transform(thrust::device, vy + first, vy + last, m + first, scratch + first, thrust::multiplies<Tv>{});
+    p_sum[1] = thrust::reduce(thrust::device, scratch + first, scratch + last, Tv{0.}, thrust::plus<Tv>{});
 
-    p_sum[0] = thrust::reduce(px.begin(), px.end(), 0., thrust::plus<Tv>{});
-    p_sum[1] = thrust::reduce(py.begin(), py.end(), 0., thrust::plus<Tv>{});
-    p_sum[2] = thrust::reduce(pz.begin(), pz.end(), 0., thrust::plus<Tv>{});
+    thrust::transform(thrust::device, vz + first, vz + last, m + first, scratch + first, thrust::multiplies<Tv>{});
+    p_sum[2] = thrust::reduce(thrust::device, scratch + first, scratch + last, Tv{0.}, thrust::plus<Tv>{});
 
-    *m_sum = thrust::reduce(thrust::device_ptr<const Tm>(m) + sum_first, thrust::device_ptr<const Tm>(m) + sum_last, 0.,
-                            thrust::plus<Tm>{});
+    *m_sum = thrust::reduce(thrust::device, m + first, m + last, Tm{0.}, thrust::plus<Tm>{});
+    //checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void sumMassAndMomentumGPU(size_t, size_t, const float*, const float*, const float*, const float*, double*,
-                                    double*);
+template void sumMassAndMomentumGPU(size_t, size_t, const float*, const float*, const float*, const float*, float*,
+                                    double*, double*);
