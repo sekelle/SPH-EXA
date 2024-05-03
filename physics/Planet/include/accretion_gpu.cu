@@ -16,15 +16,11 @@
 
 template<typename T1, typename Tremove, typename T2>
 __global__ void computeAccretionConditionKernel(size_t first, size_t last, const T1* x, const T1* y, const T1* z,
-                                                Tremove* remove, T2 star_x, T2 star_y, T2 star_z, T2 star_size2)//,
-                                                //unsigned* nrem_block)
+                                                Tremove* remove, T2 star_x, T2 star_y, T2 star_z, T2 star_size2)
 {
-    cstone::LocalIndex i    = first + blockDim.x * blockIdx.x + threadIdx.x;
-    //unsigned           nrem = 0;
+    cstone::LocalIndex i = first + blockDim.x * blockIdx.x + threadIdx.x;
 
-    if (i >= last)
-    { /*return; */
-    }
+    if (i >= last) {}
     else
     {
         const double dx    = x[i] - star_x;
@@ -32,20 +28,8 @@ __global__ void computeAccretionConditionKernel(size_t first, size_t last, const
         const double dz    = z[i] - star_z;
         const double dist2 = dx * dx + dy * dy + dz * dz;
 
-        if (dist2 < star_size2)
-        {
-            remove[i] = 1;
-            //nrem      = 1;
-        }
+        if (dist2 < star_size2) { remove[i] = 1; }
     }
-    //typedef cub::BlockReduce<unsigned, cstone::TravConfig::numThreads> BlockReduce;
-    //__shared__ typename BlockReduce::TempStorage                       temp_storage;
-
-    //BlockReduce reduce(temp_storage);
-
-    //unsigned nrem_reduced = reduce.Reduce(nrem, cub::Sum());
-    //__syncthreads();
-    //if (threadIdx.x == 0) { nrem_block[blockIdx.x] = nrem_reduced; }
 }
 
 struct debug_zero
@@ -60,7 +44,6 @@ void computeAccretionConditionGPU(size_t first, size_t last, const T1* x, const 
     cstone::LocalIndex numParticles = last - first;
     unsigned           numThreads   = 256;
     unsigned           numBlocks    = (numParticles + numThreads - 1) / numThreads;
-
 
     computeAccretionConditionKernel<<<numBlocks, numThreads>>>(first, last, x, y, z, remove, spos[0], spos[1], spos[2],
                                                                star_size * star_size);
@@ -105,7 +88,6 @@ template<typename T, typename Torder>
 void applyNewOrderGPU(size_t first, size_t last, T* x, T* scratch, Torder* order)
 {
     thrust::transform(thrust::device, order + first, order + last, scratch + first, index_access<T>{x});
-    //checkGpuErrors(cudaDeviceSynchronize());
     thrust::copy(thrust::device, scratch + first, scratch + last, x + first);
     checkGpuErrors(cudaDeviceSynchronize());
 }
@@ -136,7 +118,6 @@ void sumMassAndMomentumGPU(size_t first, size_t last, const Tv* vx, const Tv* vy
     p_sum[2] = thrust::reduce(thrust::device, scratch + first, scratch + last, Tv{0.}, thrust::plus<Tv>{});
 
     *m_sum = thrust::reduce(thrust::device, m + first, m + last, Tm{0.}, thrust::plus<Tm>{});
-    //checkGpuErrors(cudaDeviceSynchronize());
 }
 
 template void sumMassAndMomentumGPU(size_t, size_t, const float*, const float*, const float*, const float*, float*,

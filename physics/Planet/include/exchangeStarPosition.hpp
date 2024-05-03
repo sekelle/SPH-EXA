@@ -10,6 +10,7 @@
 namespace planet
 {
 
+//! @brief Compute the new star position by exchanging the force between the nodes and integrating the acceleration
 template<typename StarData>
 void computeAndExchangeStarPosition(StarData& star, double dt, double dt_m1, int rank)
 {

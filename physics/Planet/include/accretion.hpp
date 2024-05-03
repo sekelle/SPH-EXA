@@ -56,7 +56,7 @@ void applyNewOrder(size_t first, size_t last, Dataset& d, StarData& star)
     auto sortVectors = get<SortFields>(d);
 
     using ScratchFields       = FieldListExclude_t<"keys", DependentFields>;
-    auto scratch_fields_tuple = [&d]()// -> decltype(auto)
+    auto scratch_fields_tuple = [&d]()
     {
         if constexpr (std::tuple_size_v<decltype(util::make_array(ScratchFields{}))> == 1)
         {

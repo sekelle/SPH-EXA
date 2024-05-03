@@ -192,6 +192,7 @@ struct AccretionTest : public ::testing::Test
         EXPECT_NEAR(momentum_sum_y, star.p_accreted_local[1], 1e-4);
         EXPECT_NEAR(momentum_sum_z, star.p_accreted_local[2], 1e-4);
     }
+
     void testExchangeAndAccreteOnStar()
     {
         // Check if mass of star = mass of accreted particles

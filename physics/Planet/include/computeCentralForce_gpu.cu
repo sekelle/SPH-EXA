@@ -27,7 +27,7 @@ __global__ void computeCentralForceGPUKernel(size_t first, size_t last, const Tp
     cstone::LocalIndex i = first + blockDim.x * blockIdx.x + threadIdx.x;
 
     if (i >= last)
-    { /*return;*/
+    {
         star_force_thread_x[threadIdx.x]   = 0.;
         star_force_thread_y[threadIdx.x]   = 0.;
         star_force_thread_z[threadIdx.x]   = 0.;

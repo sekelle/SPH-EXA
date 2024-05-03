@@ -163,17 +163,11 @@ public:
         timer.step("domain::sync");
 
         auto& d = simData.hydro;
-        //domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
 
         d.resize(domain.nParticlesWithHalos());
         domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
-
-        // fill mass halos under the assumption that all particles have equal masses
-        // transferToHost(d, first, first + 1, {"m"});
-        // fill(get<"m">(d), 0, first, d.m[first]);
-        // fill(get<"m">(d), last, domain.nParticlesWithHalos(), d.m[first]);
 
         computeForces(domain, simData);
 

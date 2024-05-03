@@ -19,8 +19,7 @@ void computeAccretionConditionImpl(size_t first, size_t last, const T1* x, const
 {
     const double star_size2 = star_size * star_size;
 
-    size_t nrem = 0;
-#pragma omp parallel for reduction(+ : nrem)
+#pragma omp parallel for
     for (size_t i = first; i < last; i++)
     {
         const double dx    = x[i] - spos[0];
@@ -28,13 +27,8 @@ void computeAccretionConditionImpl(size_t first, size_t last, const T1* x, const
         const double dz    = z[i] - spos[2];
         const double dist2 = dx * dx + dy * dy + dz * dz;
 
-        if (dist2 < star_size2)
-        {
-            remove[i] = 1;
-            nrem++;
-        }
+        if (dist2 < star_size2) { remove[i] = 1; }
     }
-    printf("computeAccretionConditionImpl remove: %zu\n", nrem);
 }
 
 template<typename Tremove>
