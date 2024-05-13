@@ -176,10 +176,4 @@ void computeConservedQuantities(size_t startIndex, size_t endIndex, Dataset& d, 
     d.totalNeighbors = size_t(globalQuantities[9]);
 }
 
-/*template<class Dataset, typename PlanetData>
-void computeStarPotentialEnergy(size_t startIndex, size_t endIndex, Dataset& d, PlanetData& planetData, MPI_Comm comm)
-{
-
-}*/
-
 } // namespace sphexa
