@@ -14,6 +14,7 @@ struct StarData
     double                m{1.};
     double                inner_size{5.};
     double                beta{3.};
+    float                 cooling_rho_limit{1.683e-3};
     //! @brief Potential from interaction between star and particles
     double potential{};
 
@@ -47,6 +48,8 @@ struct StarData
         optionalIO("star::m", &m, 1);
         optionalIO("star::beta", &beta, 3.);
         optionalIO("star::inner_size", &inner_size, 1);
+        optionalIO("star::cooling_rho_limit", &inner_size, 1);
+
     };
 
     // Local to Rank
