@@ -13,7 +13,7 @@ struct StarData
     std::array<double, 3> position_m1{};
     double                m{1.};
     double                inner_size{5.};
-    double                beta{3.};
+    double                beta{6.28};
     float                 cooling_rho_limit{1.683e-3};
     //! @brief Potential from interaction between star and particles
     double potential{};
