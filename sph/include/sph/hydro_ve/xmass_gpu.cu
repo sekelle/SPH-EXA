@@ -84,12 +84,18 @@ __global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<T
         constexpr int ncMaxIteration = 999;
         for (int ncIt = 0; ncIt <= ncMaxIteration; ++ncIt)
         {
+            if (ncIt == ncMaxIteration - 1)
+            {
+                printf("particle: %lf\t%lf\t%lf\th: %lf\t m: %lf\t ncSph: %ud\n updateH(): %lf\n",
+                       x[i], y[i], z[i], h[i], m[i], ncSph, updateH(ng0, ncSph, h[i]));
+                //printf("updateH(), updateH^2(): %lf\t %lf", updateH(ng0, ncSph, h[i]),
+                //       updateH(ng0, ncSph, updateH(ng0, ncSph, h[i])));
+            }
             if (ncIt == ncMaxIteration)
             {
                 nc_h_convergenceFailure = true;
-                printf("particle: %lf\t%lf\t%lf\th: %lf\t m: %lf\t ncSph: %ud\n updateH(), updateH^2(): %lf\t %lf",
-                       x[i], y[i], z[i], h[i], m[i], ncSph, updateH(ng0, ncSph, h[i]),
-                       updateH(ng0, ncSph, updateH(ng0, ncSph, h[i])));
+                printf("particle: %lf\t%lf\t%lf\th: %lf\t m: %lf\t ncSph: %ud\n updateH(): %lf\n",
+                       x[i], y[i], z[i], h[i], m[i], ncSph, updateH(ng0, ncSph, h[i]));
                 //printf("updateH(), updateH^2(): %lf\t %lf", updateH(ng0, ncSph, h[i]),
                 //       updateH(ng0, ncSph, updateH(ng0, ncSph, h[i])));
             }
