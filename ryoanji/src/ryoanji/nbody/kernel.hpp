@@ -517,10 +517,11 @@ HOST_DEVICE_FUN DEVICE_INLINE Vec4<Ta> P2P(Vec4<Ta> acc, const Vec3<Tc>& pos_i, 
 {
     Vec3<Tc> dX = pos_j - pos_i;
     Tc       R2 = norm2(dX);
-
-    Th h_ij  = h_i + h_j;
-    Th h_ij2 = h_ij * h_ij;
-    Tc R2eff = (R2 < h_ij2) ? h_ij2 : R2;
+    h_i         = 0.05;
+    h_j         = 0.05;
+    Th h_ij     = h_i + h_j;
+    Th h_ij2    = h_ij * h_ij;
+    Tc R2eff    = (R2 < h_ij2) ? h_ij2 : R2;
 
     Tc invR   = inverseSquareRoot(R2eff);
     Tc invR2  = invR * invR;

@@ -48,7 +48,7 @@ struct StarData
         optionalIO("star::m", &m, 1);
         optionalIO("star::beta", &beta, 3.);
         optionalIO("star::inner_size", &inner_size, 1);
-        optionalIO("star::cooling_rho_limit", &inner_size, 1);
+        optionalIO("star::cooling_rho_limit", &cooling_rho_limit, 1);
 
     };
 
