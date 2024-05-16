@@ -84,9 +84,23 @@ __global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<T
         constexpr int ncMaxIteration = 999;
         for (int ncIt = 0; ncIt <= ncMaxIteration; ++ncIt)
         {
+            if (ncIt == ncMaxIteration - 3)
+            {
+                printf("ncIt: %d\tparticle: %lf\t%lf\t%lf\th: %lf\t m: %lf\t ncSph: %ud\n updateH(): %lf\n",ncIt,
+                       x[i], y[i], z[i], h[i], m[i], ncSph, updateH(ng0, ncSph, h[i]));
+                //printf("updateH(), updateH^2(): %lf\t %lf", updateH(ng0, ncSph, h[i]),
+                //       updateH(ng0, ncSph, updateH(ng0, ncSph, h[i])));
+            }
+            if (ncIt == ncMaxIteration - 2)
+            {
+                printf("ncIt: %d\tparticle: %lf\t%lf\t%lf\th: %lf\t m: %lf\t ncSph: %ud\n updateH(): %lf\n",ncIt,
+                       x[i], y[i], z[i], h[i], m[i], ncSph, updateH(ng0, ncSph, h[i]));
+                //printf("updateH(), updateH^2(): %lf\t %lf", updateH(ng0, ncSph, h[i]),
+                //       updateH(ng0, ncSph, updateH(ng0, ncSph, h[i])));
+            }
             if (ncIt == ncMaxIteration - 1)
             {
-                printf("particle: %lf\t%lf\t%lf\th: %lf\t m: %lf\t ncSph: %ud\n updateH(): %lf\n",
+                printf("ncIt: %d\tparticle: %lf\t%lf\t%lf\th: %lf\t m: %lf\t ncSph: %ud\n updateH(): %lf\n", ncIt,
                        x[i], y[i], z[i], h[i], m[i], ncSph, updateH(ng0, ncSph, h[i]));
                 //printf("updateH(), updateH^2(): %lf\t %lf", updateH(ng0, ncSph, h[i]),
                 //       updateH(ng0, ncSph, updateH(ng0, ncSph, h[i])));
