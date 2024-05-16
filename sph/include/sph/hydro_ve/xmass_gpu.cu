@@ -88,14 +88,14 @@ __global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<T
             {
                 nc_h_convergenceFailure = true;
                 printf("particle: %lf\t%lf\t%lf\th: %lf\t m: %lf\t ncSph: %ud\n", x[i], y[i], z[i], h[i], m[i], ncSph);
+                printf("updateH(), updateH^2(): %lf\t %lf", updateH(ng0, ncSph, h[i]),
+                       updateH(ng0, ncSph, updateH(ng0, ncSph, h[i])));
             }
             bool repeat = (ncSph < ng0 / 4 || (ncSph - 1) > ngmax) && i < bodyEnd;
             if (!cstone::ballotSync(repeat)) { break; }
             if (repeat) { h[i] = updateH(ng0, ncSph, h[i]); }
             ncSph =
                 1 + traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool)[0];
-
-
         }
 
         if (i >= bodyEnd) continue;
