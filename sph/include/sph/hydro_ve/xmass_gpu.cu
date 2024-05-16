@@ -84,17 +84,18 @@ __global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<T
         constexpr int ncMaxIteration = 99;
         for (int ncIt = 0; ncIt <= ncMaxIteration; ++ncIt)
         {
+            if (ncIt == ncMaxIteration)
+            {
+                nc_h_convergenceFailure = true;
+                printf("particle: %lf\t%lf\t%lf\th: %lf\t m: %lf\t ncSph: %ud\n", x[i], y[i], z[i], h[i], m[i], ncSph);
+            }
             bool repeat = (ncSph < ng0 / 4 || (ncSph - 1) > ngmax) && i < bodyEnd;
             if (!cstone::ballotSync(repeat)) { break; }
             if (repeat) { h[i] = updateH(ng0, ncSph, h[i]); }
             ncSph =
                 1 + traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool)[0];
 
-            if (ncIt == ncMaxIteration)
-            {
-                nc_h_convergenceFailure = true;
-                printf("particle: %lf\t%lf\t%lf\th: %lf\t m: %lf\t ncSph: %ud\n", x[i], y[i], z[i], h[i], m[i], ncSph);
-            }
+
         }
 
         if (i >= bodyEnd) continue;
