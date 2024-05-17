@@ -171,7 +171,7 @@ public:
 
         computeForces(domain, simData);
 
-        //planet::betaCooling(d, first, last, star);
+        planet::betaCooling(d, first, last, star);
         timer.step("betaCooling");
 
         planet::computeCentralForce(simData.hydro, first, last, star);

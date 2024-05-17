@@ -11,10 +11,10 @@
 
 #include "cstone/sfc/box.hpp"
 
-template<typename Tpos, typename Ts, typename Tdu, typename Trho>
-__global__ void betaCoolingGPUKernel(size_t first, size_t last, const Tpos* x, const Tpos* y, const Tpos* z, Tdu* du,
-                                     Ts star_mass, Ts star_pos_x, Ts star_pos_y, Ts star_pos_z, Ts beta, Tpos g,
-                                     Trho *rho, Trho cooling_rho_limit)
+template<typename Tpos, typename Tu, typename Ts, typename Tdu, typename Trho>
+__global__ void betaCoolingGPUKernel(size_t first, size_t last, const Tpos* x, const Tpos* y, const Tpos* z, Tu* u,
+                                     Tdu* du, Ts star_mass, Ts star_pos_x, Ts star_pos_y, Ts star_pos_z, Ts beta,
+                                     Tpos g, Trho* rho, Trho cooling_rho_limit)
 
 {
     cstone::LocalIndex i = first + blockDim.x * blockIdx.x + threadIdx.x;
@@ -27,22 +27,22 @@ __global__ void betaCoolingGPUKernel(size_t first, size_t last, const Tpos* x, c
     const double dist2 = dx * dx + dy * dy + dz * dz;
     const double dist  = sqrt(dist2);
     const double omega = sqrt(g * star_mass / (dist2 * dist));
-    du[i] += -omega / beta;
+    du[i] += -u[i] * omega / beta;
 }
 
-template<typename Tpos, typename Ts, typename Tdu, typename Trho>
-void betaCoolingGPU(size_t first, size_t last, const Tpos* x, const Tpos* y, const Tpos* z, Tdu* du, Ts star_mass,
-                    const Ts* star_pos, Ts beta, Tpos g, Trho *rho, Trho cooling_rho_limit)
+template<typename Tpos, typename Tu, typename Ts, typename Tdu, typename Trho>
+void betaCoolingGPU(size_t first, size_t last, const Tpos* x, const Tpos* y, const Tpos* z, Tu* u, Tdu* du, Ts star_mass,
+                    const Ts* star_pos, Ts beta, Tpos g, Trho* rho, Trho cooling_rho_limit)
 {
     cstone::LocalIndex numParticles = last - first;
     unsigned           numThreads   = 256;
     unsigned           numBlocks    = (numParticles + numThreads - 1) / numThreads;
 
-    betaCoolingGPUKernel<<<numBlocks, numThreads>>>(first, last, x, y, z, du, star_mass, star_pos[0], star_pos[1],
+    betaCoolingGPUKernel<<<numBlocks, numThreads>>>(first, last, x, y, z, u, du, star_mass, star_pos[0], star_pos[1],
                                                     star_pos[2], beta, g, rho, cooling_rho_limit);
 
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void betaCoolingGPU(size_t, size_t, const double*, const double*, const double* z, double*, double,
-                             const double*, double, double, float *, float);
+template void betaCoolingGPU(size_t, size_t, const double*, const double*, const double* z, double*, double*, double,
+                             const double*, double, double, float*, float);
