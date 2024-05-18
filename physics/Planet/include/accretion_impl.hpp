@@ -13,9 +13,9 @@
 namespace planet
 {
 
-template<typename T1, typename Tremove, typename T2>
-void computeAccretionConditionImpl(size_t first, size_t last, const T1* x, const T1* y, const T1* z, Tremove* remove,
-                                   const T2* spos, const T2 star_size)
+template<typename T1, typename Th, typename Tremove, typename T2>
+void computeAccretionConditionImpl(size_t first, size_t last, const T1* x, const T1* y, const T1* z, const Th* h,
+                                   Tremove* remove, const T2* spos, const T2 star_size)
 {
     const double star_size2 = star_size * star_size;
 
@@ -27,19 +27,26 @@ void computeAccretionConditionImpl(size_t first, size_t last, const T1* x, const
         const double dz    = z[i] - spos[2];
         const double dist2 = dx * dx + dy * dy + dz * dz;
 
-        if (dist2 < star_size2) { remove[i] = 1; }
+        if (dist2 < star_size2) { remove[i] = 1; } // Accrete to star
+        else if (h[i] > 5.0) { remove[i] = 2; }    // Remove from system
     }
 }
 
 template<typename Tremove>
-void computeNewOrderImpl(size_t first, size_t last, Tremove* remove, size_t* n_removed)
+void computeNewOrderImpl(size_t first, size_t last, Tremove* remove, size_t* n_accr, size_t* n_rem2)
 {
     std::vector<size_t> index(last - first);
     std::iota(index.begin(), index.end(), first);
 
     auto       sort_by_removal    = [&remove](size_t i) { return (remove[i] == 0); };
     const auto partition_iterator = std::stable_partition(index.begin(), index.end(), sort_by_removal);
-    *n_removed                    = index.end() - partition_iterator;
+    //*n_removed                    = index.end() - partition_iterator;
+
+    auto       sort_by_removal2 = [&remove](size_t i) { return (remove[i] == 1); };
+    const auto rem2_it          = std::stable_partition(partition_iterator, index.end(), sort_by_removal2);
+
+    *n_rem2 = index.end() - rem2_it;
+    *n_accr = rem2_it - partition_iterator;
 
     std::copy(index.begin(), index.end(), remove + first);
 }

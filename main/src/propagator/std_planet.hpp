@@ -176,7 +176,8 @@ public:
 
         planet::computeCentralForce(simData.hydro, first, last, star);
         timer.step("computeCentralForce");
-
+//thermal timestep
+        //auto minDt_u = computeUTimestep(first, last, d);
         computeTimestep(first, last, d);
         timer.step("Timestep");
 
@@ -194,7 +195,7 @@ public:
         fill(get<"keys">(d), first, last, KeyType{0});
 
         planet::computeAccretionCondition(first, last, d, star);
-
+//removeFarParticles
         planet::computeNewOrder(first, last, d, star);
         planet::applyNewOrder<ConservedFields, DependentFields>(first, last, d, star);
 

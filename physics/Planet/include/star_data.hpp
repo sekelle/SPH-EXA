@@ -57,6 +57,7 @@ struct StarData
     std::array<double, 3> force_local{};
     double                potential_local{};
     size_t                n_accreted{};
+    size_t                n_rem{};
     double                m_accreted_local{};
     std::array<double, 3> p_accreted_local{};
 };

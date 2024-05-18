@@ -28,11 +28,11 @@ void computeAccretionCondition(size_t first, size_t last, Dataset& d, const Star
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
         computeAccretionConditionGPU(first, last, rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z),
-                                     rawPtr(d.devData.keys), star.position.data(), star.inner_size);
+                                     rawPtr(d.devData.h), rawPtr(d.devData.keys), star.position.data(), star.inner_size);
     }
     else
     {
-        computeAccretionConditionImpl(first, last, d.x.data(), d.y.data(), d.z.data(), d.keys.data(),
+        computeAccretionConditionImpl(first, last, d.x.data(), d.y.data(), d.z.data(), d.h.data(), d.keys.data(),
                                       star.position.data(), star.inner_size);
     }
 }
@@ -43,9 +43,9 @@ void computeNewOrder(size_t first, size_t last, Dataset& d, StarData& star)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        computeNewOrderGPU(first, last, rawPtr(get<"keys">(d)), &star.n_accreted);
+        computeNewOrderGPU(first, last, rawPtr(get<"keys">(d)), &star.n_accreted, &star.n_rem);
     }
-    else { computeNewOrderImpl(first, last, d.keys.data(), &star.n_accreted); }
+    else { computeNewOrderImpl(first, last, d.keys.data(), &star.n_accreted, &star.n_rem); }
 }
 
 //! @brief Apply the new particle ordering to all the conserved fields. Dependent fields are used as scratch buffer.
@@ -90,15 +90,15 @@ void sumAccretedMassAndMomentum(size_t first, size_t last, Dataset& d, StarData&
 
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        sumMassAndMomentumGPU(last - star.n_accreted, last, rawPtr(get<"vx">(d)), rawPtr(get<"vy">(d)),
-                              rawPtr(get<"vz">(d)), rawPtr(get<"m">(d)), rawPtr(scratch), &star.m_accreted_local,
-                              star.p_accreted_local.data());
+        sumMassAndMomentumGPU(last - star.n_accreted - star.n_rem, last - star.n_rem, rawPtr(get<"vx">(d)),
+                              rawPtr(get<"vy">(d)), rawPtr(get<"vz">(d)), rawPtr(get<"m">(d)), rawPtr(scratch),
+                              &star.m_accreted_local, star.p_accreted_local.data());
     }
     else
     {
-        sumMassAndMomentumImpl(last - star.n_accreted, last, get<"vx">(d).data(), get<"vy">(d).data(),
-                               get<"vz">(d).data(), get<"m">(d).data(), scratch.data(), &star.m_accreted_local,
-                               star.p_accreted_local.data());
+        sumMassAndMomentumImpl(last - star.n_accreted - star.n_rem, last - star.n_rem, get<"vx">(d).data(),
+                               get<"vy">(d).data(), get<"vz">(d).data(), get<"m">(d).data(), scratch.data(),
+                               &star.m_accreted_local, star.p_accreted_local.data());
     }
 }
 
