@@ -55,7 +55,8 @@ void computeAccretionConditionGPU(size_t first, size_t last, const T1* x, const 
     printf("computeAccretionConditionGPU remove : %u\n", nrem);
 }
 
-template void computeAccretionConditionGPU(size_t, size_t, const double*, const double*, const double*, uint64_t*,
+template void computeAccretionConditionGPU(size_t, size_t, const double*, const double*, const double*,
+                                           const float*, uint64_t*,
                                            const double*, double);
 template<typename T>
 struct is_zero
