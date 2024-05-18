@@ -202,7 +202,7 @@ public:
         planet::sumAccretedMassAndMomentum<DependentFields>(first, last, d, star);
         planet::exchangeAndAccreteOnStar(star, d.minDt_m1, rank);
 
-        domain.setEndIndex(last - star.n_accreted);
+        domain.setEndIndex(last - star.n_accreted - star.n_rem);
 
         timer.step("accreteParticles");
 
