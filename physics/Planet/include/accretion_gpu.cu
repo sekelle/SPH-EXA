@@ -47,17 +47,16 @@ void computeAccretionConditionGPU(size_t first, size_t last, const T1* x, const 
     unsigned           numThreads   = 256;
     unsigned           numBlocks    = (numParticles + numThreads - 1) / numThreads;
 
-    computeAccretionConditionKernel<<<numBlocks, numThreads>>>(first, last, x, y, z, remove, spos[0], spos[1], spos[2],
-                                                               h, star_size * star_size);
+    computeAccretionConditionKernel<<<numBlocks, numThreads>>>(first, last, x, y, z, h, remove, spos[0], spos[1],
+                                                               spos[2], star_size * star_size);
     checkGpuErrors(cudaGetLastError());
     checkGpuErrors(cudaDeviceSynchronize());
     size_t nrem = thrust::count_if(thrust::device, remove + first, remove + last, debug_zero{});
     printf("computeAccretionConditionGPU remove : %u\n", nrem);
 }
 
-template void computeAccretionConditionGPU(size_t, size_t, const double*, const double*, const double*,
-                                           const float*, uint64_t*,
-                                           const double*, double);
+template void computeAccretionConditionGPU(size_t, size_t, const double*, const double*, const double*, const float*,
+                                           uint64_t*, const double*, double);
 template<typename T>
 struct is_zero
 {
@@ -72,8 +71,7 @@ struct is_one
 };
 
 template<typename Tremove>
-void computeNewOrderGPU(size_t first, size_t last, Tremove* remove, size_t* n_accr,
-                        size_t *n_rem)
+void computeNewOrderGPU(size_t first, size_t last, Tremove* remove, size_t* n_accr, size_t* n_rem)
 {
     thrust::device_vector<size_t> index(last - first);
     thrust::sequence(index.begin(), index.end(), first);
