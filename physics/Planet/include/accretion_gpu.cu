@@ -72,7 +72,7 @@ struct is_one
 
 template<typename Tremove>
 void computeNewOrderGPU(size_t first, size_t last, Tremove* remove, size_t* n_accr,
-                        size_t *n_rem2)
+                        size_t *n_rem)
 {
     thrust::device_vector<size_t> index(last - first);
     thrust::sequence(index.begin(), index.end(), first);
