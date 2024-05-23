@@ -176,8 +176,7 @@ public:
 
         planet::computeCentralForce(simData.hydro, first, last, star);
         timer.step("computeCentralForce");
-//thermal timestep
-        //auto minDt_u = computeUTimestep(first, last, d);
+
         computeTimestep(first, last, d);
         timer.step("Timestep");
 
@@ -195,14 +194,14 @@ public:
         fill(get<"keys">(d), first, last, KeyType{0});
 
         planet::computeAccretionCondition(first, last, d, star);
-//removeFarParticles
+
         planet::computeNewOrder(first, last, d, star);
         planet::applyNewOrder<ConservedFields, DependentFields>(first, last, d, star);
 
         planet::sumAccretedMassAndMomentum<DependentFields>(first, last, d, star);
         planet::exchangeAndAccreteOnStar(star, d.minDt_m1, rank);
 
-        domain.setEndIndex(last - star.n_accreted - star.n_rem);
+        domain.setEndIndex(last - star.n_accreted_local - star.n_removed_local);
 
         timer.step("accreteParticles");
 
@@ -212,7 +211,7 @@ public:
             printf("star mass: %lf\n", star.m);
             printf("additional pot. erg.: %lf\n", star.potential);
         }
-        printf("rank: %d, removed %zu\n", rank, star.n_accreted);
+        printf("rank: %d, accreted %zu, removed %zu\n", rank, star.n_accreted_local, star.n_removed_local);
     }
 
     void saveFields(IFileWriter* writer, size_t first, size_t last, DataType& simData,

@@ -15,7 +15,7 @@ namespace planet
 
 template<typename T1, typename Th, typename Tremove, typename T2>
 void computeAccretionConditionImpl(size_t first, size_t last, const T1* x, const T1* y, const T1* z, const Th* h,
-                                   Tremove* remove, const T2* spos, const T2 star_size)
+                                   Tremove* remove, const T2* spos, const T2 star_size, const T2 removal_limit_h)
 {
     const double star_size2 = star_size * star_size;
 
@@ -28,25 +28,24 @@ void computeAccretionConditionImpl(size_t first, size_t last, const T1* x, const
         const double dist2 = dx * dx + dy * dy + dz * dz;
 
         if (dist2 < star_size2) { remove[i] = 1; } // Accrete to star
-        else if (h[i] > 5.0) { remove[i] = 2; }    // Remove from system
+        else if (h[i] > removal_limit_h) { remove[i] = 2; }    // Remove from system
     }
 }
 
 template<typename Tremove>
-void computeNewOrderImpl(size_t first, size_t last, Tremove* remove, size_t* n_accr, size_t* n_rem2)
+void computeNewOrderImpl(size_t first, size_t last, Tremove* remove, size_t* n_accreted, size_t* n_removed)
 {
     std::vector<size_t> index(last - first);
     std::iota(index.begin(), index.end(), first);
 
-    auto       sort_by_removal    = [&remove](size_t i) { return (remove[i] == 0); };
-    const auto partition_iterator = std::stable_partition(index.begin(), index.end(), sort_by_removal);
-    //*n_removed                    = index.end() - partition_iterator;
+    auto       keep_particle  = [&remove](size_t i) { return (remove[i] == 0); };
+    const auto begin_accreted = std::stable_partition(index.begin(), index.end(), keep_particle);
 
-    auto       sort_by_removal2 = [&remove](size_t i) { return (remove[i] == 1); };
-    const auto rem2_it          = std::stable_partition(partition_iterator, index.end(), sort_by_removal2);
+    auto       accrete_particle = [&remove](size_t i) { return (remove[i] == 1); };
+    const auto begin_removed    = std::stable_partition(begin_accreted, index.end(), accrete_particle);
 
-    *n_rem2 = index.end() - rem2_it;
-    *n_accr = rem2_it - partition_iterator;
+    *n_accreted = begin_removed - begin_accreted;
+    *n_removed  = index.end() - begin_removed;
 
     std::copy(index.begin(), index.end(), remove + first);
 }
