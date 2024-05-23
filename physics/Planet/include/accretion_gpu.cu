@@ -56,7 +56,7 @@ void computeAccretionConditionGPU(size_t first, size_t last, const T1* x, const 
 }
 
 template void computeAccretionConditionGPU(size_t, size_t, const double*, const double*, const double*, const float*,
-                                           uint64_t*, const double*, double);
+                                           uint64_t*, const double*, double, double);
 template<typename T>
 struct KeepParticle
 {
