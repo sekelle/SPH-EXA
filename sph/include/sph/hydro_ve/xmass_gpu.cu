@@ -120,10 +120,11 @@ __global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<T
             if (!cstone::ballotSync(repeat)) { break; }
             if (repeat)
             {
-                if (notEnough)
+                h[i] = (updateH(ng0, ncSph, h[i]) + h[i] * ncIt) / T{ncIt + 1};
+                /*if (notEnough)
                     h[i] = updateH(ng0, ncSph, h[i]);
                 else if (tooMany)
-                    h[i] *= 0.95;
+                    h[i] *= 0.95;*/
             }
             ncSph =
                 1 + traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool)[0];

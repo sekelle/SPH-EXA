@@ -154,7 +154,7 @@ struct AccretionTest : public ::testing::Test
 
     void testMoveAccretedToEnd()
     {
-        for (size_t i = domain_ptr->startIndex(); i < domain_ptr->endIndex() - star.n_accreted; i++)
+        for (size_t i = domain_ptr->startIndex(); i < domain_ptr->endIndex() - star.n_accreted_local; i++)
         {
             T x    = data.x[i];
             T y    = data.y[i];
@@ -163,7 +163,7 @@ struct AccretionTest : public ::testing::Test
             EXPECT_TRUE(dist >= inner_limit);
         }
 
-        for (size_t i = domain_ptr->endIndex() - star.n_accreted; i < domain_ptr->endIndex(); i++)
+        for (size_t i = domain_ptr->endIndex() - star.n_accreted_local; i < domain_ptr->endIndex(); i++)
         {
             T x    = data.x[i];
             T y    = data.y[i];
@@ -179,7 +179,7 @@ struct AccretionTest : public ::testing::Test
         T momentum_sum_y = 0.;
         T momentum_sum_z = 0.;
         T m              = 0.;
-        for (size_t i = domain_ptr->endIndex() - star.n_accreted; i < domain_ptr->endIndex(); i++)
+        for (size_t i = domain_ptr->endIndex() - star.n_accreted_local; i < domain_ptr->endIndex(); i++)
         {
 
             momentum_sum_x += data.vx[i] * data.m[i];
@@ -230,7 +230,7 @@ TEST_F(AccretionTest, testAccretion)
     planet::exchangeAndAccreteOnStar(star, dt, rank);
     testExchangeAndAccreteOnStar();
 
-    domain_ptr->setEndIndex(last - star.n_accreted);
+    domain_ptr->setEndIndex(last - star.n_accreted_local);
 
     sync();
 
