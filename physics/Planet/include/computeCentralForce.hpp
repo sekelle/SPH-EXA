@@ -68,6 +68,10 @@ void computeCentralForce(Dataset& d, size_t startIndex, size_t endIndex, StarDat
         transferToHost(d, startIndex, endIndex, {"y"});
         transferToHost(d, startIndex, endIndex, {"z"});
         transferToHost(d, startIndex, endIndex, {"m"});
+        transferToHost(d, startIndex, endIndex, {"ax"});
+        transferToHost(d, startIndex, endIndex, {"ay"});
+        transferToHost(d, startIndex, endIndex, {"az"});
+
         computeCentralForceImpl(startIndex, endIndex, d.x.data(), d.y.data(), d.z.data(), d.ax.data(), d.ay.data(),
                                 d.az.data(), d.m.data(), star.position.data(), star.m, star.force_local.data(),
                                 &star.potential_local, d.g);
@@ -84,7 +88,7 @@ void computeCentralForce(Dataset& d, size_t startIndex, size_t endIndex, StarDat
                                 &star.potential_local, d.g);
     }
     printf("fx: %g, fy: %g, fz: %g, pot: %g\n", star.force_local[0], star.force_local[1], star.force_local[2],
-           star.potential);
+           star.potential_local);
 }
 
 } // namespace planet
