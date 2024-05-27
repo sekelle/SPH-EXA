@@ -196,7 +196,7 @@ public:
         planet::computeAccretionCondition(first, last, d, star);
 
         planet::computeNewOrder(first, last, d, star);
-        //planet::applyNewOrder<ConservedFields, DependentFields>(first, last, d, star);
+        planet::applyNewOrder<ConservedFields, DependentFields>(first, last, d, star);
 
         //planet::sumAccretedMassAndMomentum<DependentFields>(first, last, d, star);
         //planet::exchangeAndAccreteOnStar(star, d.minDt_m1, rank);
