@@ -186,7 +186,7 @@ public:
 
         d.resize(domain.nParticlesWithHalos());
         domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
-        //size_t first = domain.startIndex();
+        first = domain.startIndex();
         last = domain.endIndex();
 
         computeForces(domain, simData);
