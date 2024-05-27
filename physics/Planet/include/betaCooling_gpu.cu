@@ -12,9 +12,9 @@
 #include "cstone/sfc/box.hpp"
 
 template<typename Tpos, typename Tu, typename Ts, typename Tdu, typename Trho>
-__global__ void betaCoolingGPUKernel(size_t first, size_t last, const Tpos* x, const Tpos* y, const Tpos* z, Tu* u,
+__global__ void betaCoolingGPUKernel(size_t first, size_t last, const Tpos* x, const Tpos* y, const Tpos* z, const Tu* u,
                                      Tdu* du, Ts star_mass, Ts star_pos_x, Ts star_pos_y, Ts star_pos_z, Ts beta,
-                                     Tpos g, Trho* rho, Trho cooling_rho_limit)
+                                     Tpos g, const Trho* rho, Trho cooling_rho_limit)
 
 {
     cstone::LocalIndex i = first + blockDim.x * blockIdx.x + threadIdx.x;
@@ -24,15 +24,15 @@ __global__ void betaCoolingGPUKernel(size_t first, size_t last, const Tpos* x, c
     const double dx    = x[i] - star_pos_x;
     const double dy    = y[i] - star_pos_y;
     const double dz    = z[i] - star_pos_z;
-    const double dist2 = dx * dx + dy * dy + dz * dz;
+    const double dist2 = dx * dx + dy * dy;
     const double dist  = sqrt(dist2);
     const double omega = sqrt(g * star_mass / (dist2 * dist));
     du[i] += -u[i] * omega / beta;
 }
 
 template<typename Tpos, typename Tu, typename Ts, typename Tdu, typename Trho>
-void betaCoolingGPU(size_t first, size_t last, const Tpos* x, const Tpos* y, const Tpos* z, Tu* u, Tdu* du, Ts star_mass,
-                    const Ts* star_pos, Ts beta, Tpos g, Trho* rho, Trho cooling_rho_limit)
+void betaCoolingGPU(size_t first, size_t last, const Tpos* x, const Tpos* y, const Tpos* z, const Tu* u, Tdu* du,
+                    Ts star_mass, const Ts* star_pos, Ts beta, Tpos g, const Trho* rho, Trho cooling_rho_limit)
 {
     cstone::LocalIndex numParticles = last - first;
     unsigned           numThreads   = 256;
@@ -44,5 +44,5 @@ void betaCoolingGPU(size_t first, size_t last, const Tpos* x, const Tpos* y, con
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void betaCoolingGPU(size_t, size_t, const double*, const double*, const double* z, double*, double*, double,
-                             const double*, double, double, float*, float);
+template void betaCoolingGPU(size_t, size_t, const double*, const double*, const double* z, const double*, double*,
+                             double, const double*, double, double, const float*, float);
