@@ -193,7 +193,7 @@ public:
 
         fill(get<"keys">(d), first, last, KeyType{0});
 
-        //planet::computeAccretionCondition(first, last, d, star);
+        planet::computeAccretionCondition(first, last, d, star);
 
         //planet::computeNewOrder(first, last, d, star);
         //planet::applyNewOrder<ConservedFields, DependentFields>(first, last, d, star);
