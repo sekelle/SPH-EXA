@@ -136,4 +136,4 @@ void exchangeAndAccreteOnStar(StarData& star, double minDt_m1, int rank)
     MPI_Bcast(&star.m, 1, MpiType<double>{}, 0, MPI_COMM_WORLD);
 }
 
-}; // namespace planet
+} // namespace planet
