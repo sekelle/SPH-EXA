@@ -158,6 +158,7 @@ public:
     void step(DomainType& domain, DataType& simData) override
     {
         timer.start();
+        auto& d = simData.hydro;
 
         using KeyType = typename DataType::HydroData::KeyType;
 
@@ -166,15 +167,15 @@ public:
 
         int rank = 0;
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-        fill(get<"keys">(simData.hydro), first, last, KeyType{0});
+        fill(get<"keys">(d), first, last, KeyType{0});
 
-        planet::computeAccretionCondition(first, last, simData.hydro, star);
+        planet::computeAccretionCondition(first, last, d, star);
 
-        planet::computeNewOrder(first, last, simData.hydro, star);
-        planet::applyNewOrder<ConservedFields, DependentFields>(first, last, simData.hydro, star);
+        planet::computeNewOrder(first, last, d, star);
+        planet::applyNewOrder<ConservedFields, DependentFields>(first, last, d, star);
 
-        planet::sumAccretedMassAndMomentum<DependentFields>(first, last, simData.hydro, star);
-        planet::exchangeAndAccreteOnStar(star, simData.hydro.minDt_m1, rank);
+        planet::sumAccretedMassAndMomentum<DependentFields>(first, last, d, star);
+        planet::exchangeAndAccreteOnStar(star, d.minDt_m1, rank);
 
         domain.setEndIndex(last - star.n_accreted_local - star.n_removed_local);
 
@@ -183,12 +184,10 @@ public:
         sync(domain, simData);
         timer.step("domain::sync");
 
-        auto& d = simData.hydro;
-
         d.resize(domain.nParticlesWithHalos());
         domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
         //size_t first = domain.startIndex();
-        last  = domain.endIndex();
+        last = domain.endIndex();
 
         computeForces(domain, simData);
 
