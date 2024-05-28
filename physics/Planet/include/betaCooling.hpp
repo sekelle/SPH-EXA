@@ -42,4 +42,31 @@ void betaCooling(Dataset& d, size_t startIndex, size_t endIndex, const StarData&
                         star.position.data(), star.beta, d.g, d.rho.data(), star.cooling_rho_limit);
     }
 }
+
+template<typename Tu, typename Tdu>
+double computeHeatingTimestepImpl(size_t first, size_t last, Tu* u, Tdu* du)
+{
+    double timestep = std::numeric_limits<double>::infinity();
+    for (size_t i = first; i < last; i++)
+    {
+        const double timestep_i = std::abs(0.25 * u[i] / du[i]);
+        timestep = std::min(timestep, timestep_i);
+    }
+    return timestep;
+}
+
+template<typename Dataset, typename StarData>
+void computeHeatingTimestep(Dataset& d, size_t startIndex, size_t endIndex, const StarData& star)
+{
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    {
+        return computeHeatingTimestepGPU(startIndex, endIndex, rawPtr(get<"u">(d)), rawPtr(get<"du">(d)));
+
+    }
+    else
+    {
+        return computeHeatingTimestepImpl(startIndex, endIndex, d.u.data(), d.du.data());
+    }
+}
+
 } // namespace planet
