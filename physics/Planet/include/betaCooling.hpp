@@ -60,7 +60,10 @@ void computeHeatingTimestep(Dataset& d, size_t startIndex, size_t endIndex, cons
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        return computeHeatingTimestepGPU(startIndex, endIndex, rawPtr(get<"u">(d)), rawPtr(get<"du">(d)));
+        //return computeHeatingTimestepGPU(startIndex, endIndex, rawPtr(get<"u">(d)), rawPtr(get<"du">(d)));
+        transferToHost(d, startIndex, endIndex, {"u"});
+        transferToHost(d, startIndex, endIndex, {"du"});
+        return computeHeatingTimestepImpl(startIndex, endIndex, d.u.data(), d.du.data());
 
     }
     else
