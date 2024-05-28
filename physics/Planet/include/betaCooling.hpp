@@ -55,7 +55,7 @@ double computeHeatingTimestepImpl(size_t first, size_t last, Tu* u, Tdu* du)
     return timestep;
 }
 
-template<typename Dataset, typename StarData>
+template<typename Dataset>
 double computeHeatingTimestep(Dataset& d, size_t startIndex, size_t endIndex)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
