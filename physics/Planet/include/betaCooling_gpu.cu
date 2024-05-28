@@ -13,7 +13,7 @@
 
 template<typename Tpos, typename Tu, typename Ts, typename Tdu, typename Trho>
 __global__ void betaCoolingGPUKernel(size_t first, size_t last, const Tpos* x, const Tpos* y, const Tpos* z,
-                                     const Tu* u, Tdu* du, Ts star_mass, Ts star_pos_x, Ts star_pos_y, Ts star_pos_z,
+                                      Tu* u, Tdu* du, Ts star_mass, Ts star_pos_x, Ts star_pos_y, Ts star_pos_z,
                                      Ts beta, Tpos g, const Trho* rho, Trho cooling_rho_limit)
 
 {
@@ -28,10 +28,11 @@ __global__ void betaCoolingGPUKernel(size_t first, size_t last, const Tpos* x, c
     const double dist  = sqrt(dist2);
     const double omega = sqrt(g * star_mass / (dist2 * dist));
     du[i] += -u[i] * omega / beta;
+    if (u[i] < 1e-6) u[i] = 1e-6;
 }
 
 template<typename Tpos, typename Tu, typename Ts, typename Tdu, typename Trho>
-void betaCoolingGPU(size_t first, size_t last, const Tpos* x, const Tpos* y, const Tpos* z, const Tu* u, Tdu* du,
+void betaCoolingGPU(size_t first, size_t last, const Tpos* x, const Tpos* y, const Tpos* z, Tu* u, Tdu* du,
                     Ts star_mass, const Ts* star_pos, Ts beta, Tpos g, const Trho* rho, Trho cooling_rho_limit)
 {
     cstone::LocalIndex numParticles = last - first;
@@ -44,7 +45,7 @@ void betaCoolingGPU(size_t first, size_t last, const Tpos* x, const Tpos* y, con
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void betaCoolingGPU(size_t, size_t, const double*, const double*, const double* z, const double*, double*,
+template void betaCoolingGPU(size_t, size_t, const double*, const double*, const double* z, double*, double*,
                              double, const double*, double, double, const float*, float);
 
 template<typename Tu, typename Tdu>

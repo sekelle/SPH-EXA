@@ -24,6 +24,8 @@ void betaCoolingImpl(size_t first, size_t last, const Tpos* x, const Tpos* y, co
         const double dist  = std::sqrt(dist2);
         const double omega = std::sqrt(g * star_mass / (dist2 * dist));
         du[i] += -u[i] * omega / beta;
+        //Temperature floor
+        // if (u[i] < 1e-6) u[i] = 1e-6;
     }
 }
 
