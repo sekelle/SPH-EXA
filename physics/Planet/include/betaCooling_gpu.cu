@@ -57,7 +57,7 @@ template<typename Tu, typename Tdu>
 double computeHeatingTimestepGPU(size_t first, size_t last, const Tu* u, const Tdu* du)
 {
 
-    double minDt = 0.25 * thrust::transform_reduce(thrust::device, u + first, u + last, du + first,
+    double minDt = 0.25 * thrust::transform_reduce(u + first, u + last, du + first,
                                                    std::numeric_limits<double>::infinity(), f<Tu, Tdu>{},
                                                    thrust::minimum<double>());
 
