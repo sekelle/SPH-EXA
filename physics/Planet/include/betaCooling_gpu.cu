@@ -56,9 +56,9 @@ struct f
 template<typename Tu, typename Tdu>
 double computeHeatingTimestepGPU(size_t first, size_t last, const Tu* u, const Tdu* du)
 {
-    auto f = [] __device__(Tu u, Tdu du) { return abs(0.25 * u / du); };
 
-    double minDt = 0.25 * thrust::transform_reduce(thrust::device, u + first, u + last, du + first, f,
+
+    double minDt = 0.25 * thrust::transform_reduce(thrust::device, u + first, u + last, du + first, f<Tu, Tdu>{},
                                                    std::numeric_limits<double>::infinity(), thrust::minimum<double>());
 
     checkGpuErrors(cudaDeviceSynchronize());
