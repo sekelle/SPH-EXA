@@ -12,9 +12,9 @@
 #include "cstone/sfc/box.hpp"
 
 template<typename Tpos, typename Tu, typename Ts, typename Tdu, typename Trho>
-__global__ void betaCoolingGPUKernel(size_t first, size_t last, const Tpos* x, const Tpos* y, const Tpos* z, const Tu* u,
-                                     Tdu* du, Ts star_mass, Ts star_pos_x, Ts star_pos_y, Ts star_pos_z, Ts beta,
-                                     Tpos g, const Trho* rho, Trho cooling_rho_limit)
+__global__ void betaCoolingGPUKernel(size_t first, size_t last, const Tpos* x, const Tpos* y, const Tpos* z,
+                                     const Tu* u, Tdu* du, Ts star_mass, Ts star_pos_x, Ts star_pos_y, Ts star_pos_z,
+                                     Ts beta, Tpos g, const Trho* rho, Trho cooling_rho_limit)
 
 {
     cstone::LocalIndex i = first + blockDim.x * blockIdx.x + threadIdx.x;
@@ -47,19 +47,16 @@ void betaCoolingGPU(size_t first, size_t last, const Tpos* x, const Tpos* y, con
 template void betaCoolingGPU(size_t, size_t, const double*, const double*, const double* z, const double*, double*,
                              double, const double*, double, double, const float*, float);
 
-
 template<typename Tu, typename Tdu>
 double computeHeatingTimestepGPU(size_t first, size_t last, const Tu* u, const Tdu* du)
 {
-    auto f = []__device__ (Tu u, Tdu du)
-    { return abs(0.25 * u / du); }
+    auto f = [] __device__(Tu u, Tdu du) { return abs(0.25 * u / du); };
 
     double minDt = 0.25 * thrust::transform_reduce(thrust::device, u + first, u + last, du + first, f,
-                             std::numeric_limits<double>::infinity(), thrust::minimum<double>());
-
+                                                   std::numeric_limits<double>::infinity(), thrust::minimum<double>());
 
     checkGpuErrors(cudaDeviceSynchronize());
-    return  minDt;
+    return minDt;
 }
 
-template void computeHeatingTimestepGPU(size_t, size_t, const double*, const double*);
+template double computeHeatingTimestepGPU(size_t, size_t, const double*, const double*);
