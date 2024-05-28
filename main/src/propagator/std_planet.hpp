@@ -187,7 +187,7 @@ public:
         d.resize(domain.nParticlesWithHalos());
         domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
         first = domain.startIndex();
-        last = domain.endIndex();
+        last  = domain.endIndex();
 
         computeForces(domain, simData);
 
@@ -196,8 +196,8 @@ public:
 
         planet::computeCentralForce(simData.hydro, first, last, star);
         timer.step("computeCentralForce");
-
-        computeTimestep(first, last, d);
+        double dtu = planet::computeHeatingTimestep(d, first, last);
+        computeTimestep(first, last, d, dtu);
         timer.step("Timestep");
 
         computePositions(first, last, d, domain.box());
