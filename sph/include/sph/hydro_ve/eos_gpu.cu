@@ -51,7 +51,7 @@ __global__ void cudaEOS(size_t firstParticle, size_t lastParticle, Tm mui, Tt ga
 
     Thydro p_i;
     Thydro rho_i         = kx[i] * m[i] / xm[i];
-    util::tie(p_i, c[i]) = idealGasEOS(u[i], rho_i, mui, gamma);
+    util::tie(p_i, c[i]) = idealGasEOS_u(u[i], rho_i, gamma);
     prho[i]              = p_i / (kx[i] * m[i] * m[i] * gradh[i]);
     if (rho) { rho[i] = rho_i; }
     if (p) { p[i] = p_i; }

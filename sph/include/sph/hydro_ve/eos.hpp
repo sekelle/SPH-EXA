@@ -68,7 +68,7 @@ void computeEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
     for (size_t i = startIndex; i < endIndex; ++i)
     {
         auto rho      = kx[i] * m[i] / xm[i];
-        auto [pi, ci] = idealGasEOS(u[i], rho, d.muiConst, d.gamma);
+        auto [pi, ci] = idealGasEOS_u(u[i], rho, d.gamma);
         prho[i]       = pi / (kx[i] * m[i] * m[i] * gradh[i]);
         c[i]          = ci;
         if (storeRho) { d.rho[i] = rho; }
