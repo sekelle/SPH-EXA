@@ -263,9 +263,9 @@ public:
 
         planet::computeCentralForce(simData.hydro, first, last, star);
         timer.step("computeCentralForce");
-        double dtu = planet::computeHeatingTimestep(d, first, last);
+       // double dtu = planet::computeHeatingTimestep(d, first, last);
 
-        computeTimestep(first, last, d, dtu);
+        computeTimestep(first, last, d );
         timer.step("Timestep");
         computePositions(first, last, d, domain.box());
         updateSmoothingLength(first, last, d);
