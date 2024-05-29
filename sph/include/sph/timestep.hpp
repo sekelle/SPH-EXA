@@ -54,7 +54,7 @@ auto accelerationTimestep(size_t first, size_t last, const Dataset& d)
     {
         maxAccSq    = cstone::maxNormSquareGpu(rawPtr(d.devData.ax) + first, rawPtr(d.devData.ay) + first,
                                                rawPtr(d.devData.az) + first, last - first);
-        auto minmax = cstone::MinMaxGpu<T>{}(rawPtr(d.devData.h) + first, rawPtr(d.devData.h) + last);
+        auto minmax = cstone::MinMaxGpu<typename Dataset::HydroType>{}(rawPtr(d.devData.h) + first, rawPtr(d.devData.h) + last);
         min_eps     = std::get<0>(minmax);
     }
     else
