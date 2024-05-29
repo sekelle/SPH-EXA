@@ -64,8 +64,8 @@ auto accelerationTimestep(size_t first, size_t last, const Dataset& d)
         {
             cstone::Vec3<T> X{d.ax[i], d.ay[i], d.az[i]};
             maxAccSq = std::max(norm2(X), maxAccSq);
-            min_eps = *std::min_element(d.h.begin() + first, d.h.begin() + last);
         }
+        min_eps = *std::min_element(d.h.begin() + first, d.h.begin() + last);
     }
 
     return d.etaAcc * std::sqrt(min_eps / std::sqrt(maxAccSq));

@@ -110,7 +110,7 @@ public:
     //! @brief gravitational smoothing
     RealType eps{0.005};
     //! @brief acceleration based time-step control
-    RealType etaAcc{0.2};
+    RealType etaAcc{0.1};
 
     //! @brief adiabatic index
     RealType gamma{5.0 / 3.0};
