@@ -160,6 +160,8 @@ public:
         auto& d = simData.hydro;
 
         d.resize(domain.nParticlesWithHalos());
+        domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
+
         resizeNeighbors(d, domain.nParticles() * d.ngmax);
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
