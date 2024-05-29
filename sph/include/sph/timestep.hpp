@@ -46,13 +46,16 @@ namespace sph
 template<class Dataset>
 auto accelerationTimestep(size_t first, size_t last, const Dataset& d)
 {
-    using T = typename Dataset::RealType;
+    using T    = typename Dataset::RealType;
 
+    T min_eps  = d.eps;
     T maxAccSq = 0.0;
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        maxAccSq = cstone::maxNormSquareGpu(rawPtr(d.devData.ax) + first, rawPtr(d.devData.ay) + first,
-                                            rawPtr(d.devData.az) + first, last - first);
+        maxAccSq    = cstone::maxNormSquareGpu(rawPtr(d.devData.ax) + first, rawPtr(d.devData.ay) + first,
+                                               rawPtr(d.devData.az) + first, last - first);
+        auto minmax = cstone::MinMaxGpu<T>{}(rawPtr(d.devData.h) + first, rawPtr(d.devData.h) + last);
+        min_eps     = std::get<0>(minmax);
     }
     else
     {
@@ -61,10 +64,13 @@ auto accelerationTimestep(size_t first, size_t last, const Dataset& d)
         {
             cstone::Vec3<T> X{d.ax[i], d.ay[i], d.az[i]};
             maxAccSq = std::max(norm2(X), maxAccSq);
+            min_eps = *std::min_element(d.h.begin() + first, d.h.begin() + last);
         }
     }
 
-    return d.etaAcc * std::sqrt(d.eps / std::sqrt(maxAccSq));
+    return d.etaAcc * std::sqrt(min_eps / std::sqrt(maxAccSq));
+
+    //return d.etaAcc * std::sqrt(d.eps / std::sqrt(maxAccSq));
 }
 
 //! @brief limit time-step based on divergence of velocity, this is called in the propagator when Divv is available
