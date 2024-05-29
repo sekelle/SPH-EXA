@@ -101,7 +101,7 @@ public:
     //! temporary MPI rank local timesteps;
     RealType minDtCourant{INFINITY}, minDtRho{INFINITY};
     //! @brief Fraction of Courant condition for timestep
-    RealType Kcour{0.2};
+    RealType Kcour{0.1};
     //! @brief Fraction of 1/|divv| condition for timestep
     RealType Krho{0.06};
 

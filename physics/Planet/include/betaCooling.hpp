@@ -51,7 +51,7 @@ double computeHeatingTimestepImpl(size_t first, size_t last, Tu* u, Tdu* du)
     double timestep = std::numeric_limits<double>::infinity();
     for (size_t i = first; i < last; i++)
     {
-        const double timestep_i = std::abs(0.25 * u[i] / du[i]);
+        const double timestep_i = std::abs(0.1 * u[i] / du[i]);
         timestep = std::min(timestep, timestep_i);
     }
     return timestep;
