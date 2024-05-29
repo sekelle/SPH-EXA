@@ -198,6 +198,7 @@ public:
         timer.step("computeCentralForce");
         double dtu = planet::computeHeatingTimestep(d, first, last);
         computeTimestep(first, last, d, dtu);
+
         timer.step("Timestep");
 
         computePositions(first, last, d, domain.box());
@@ -212,6 +213,7 @@ public:
             printf("star position: %lf\t%lf\t%lf\n", star.position[0], star.position[1], star.position[2]);
             printf("star mass: %lf\n", star.m);
             printf("additional pot. erg.: %lf\n", star.potential);
+            printf("heating timestep: %lf\t courant: %lf\n", dtu, d.minDtCourant);
         }
         printf("rank: %d, accreted %zu, removed %zu\n", rank, star.n_accreted_local, star.n_removed_local);
     }
