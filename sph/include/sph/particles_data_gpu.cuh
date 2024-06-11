@@ -101,7 +101,7 @@ public:
     DevVector<KeyType>   keys;                               // Particle space-filling-curve keys
     DevVector<unsigned>  nc;                                 // number of neighbors of each particle
     DevVector<HydroType> dV11, dV12, dV13, dV22, dV23, dV33; // Velocity gradient components
-    DevVector<KeyType>   particleIDs;
+    DevVector<unsigned>   particleIDs;
 
     //! @brief SPH interpolation kernel lookup tables
     DevVector<HydroType> wh, whd;

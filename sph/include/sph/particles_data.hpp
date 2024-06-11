@@ -229,7 +229,7 @@ public:
     FieldVector<KeyType>   keys;                               // Particle space-filling-curve keys
     FieldVector<unsigned>  nc;                                 // number of neighbors of each particle
     FieldVector<HydroType> dV11, dV12, dV13, dV22, dV23, dV33; // Velocity gradient components
-    FieldVector<KeyType>   particleIDs;
+    FieldVector<unsigned>   particleIDs;
 
     //! @brief Indices of neighbors for each particle, length is number of assigned particles * ngmax. CPU version only.
     std::vector<cstone::LocalIndex>             neighbors;
