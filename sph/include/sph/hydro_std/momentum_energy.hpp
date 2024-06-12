@@ -83,6 +83,7 @@ void computeMomentumEnergyStdImpl(size_t startIndex, size_t endIndex, Dataset& d
         T maxvsignal = 0;
 
         unsigned ncCapped = std::min(neighborsCount[i] - 1, d.ngmax);
+        if (d.ParticleIDs[i] == 815815) { printf("have particle\n"); }
         momentumAndEnergyJLoop(i, d.K, box, neighbors + d.ngmax * ni, ncCapped, x, y, z, vx, vy, vz, h, m, rho, p, c,
                                c11, c12, c13, c22, c23, c33, wh, whd, grad_P_x, grad_P_y, grad_P_z, du, &maxvsignal);
 
