@@ -150,8 +150,8 @@ public:
         {
             mHolder_.upsweep(d, domain);
             timer.step("Upsweep");
-            mHolder_.traverse(d, domain);
-            timer.step("Gravity");
+            //mHolder_.traverse(d, domain);
+            //timer.step("Gravity");
         }
     }
 
