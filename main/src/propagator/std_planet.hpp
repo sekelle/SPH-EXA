@@ -124,7 +124,9 @@ public:
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
         auto&  d     = simData.hydro;
-if (d.iteration == 150) { printf("it 150\n"); }
+if (d.iteration == 150) {
+            printf("it 150\n");
+}
         resizeNeighbors(d, domain.nParticles() * d.ngmax);
         findNeighborsSfc(first, last, d, domain.box());
         timer.step("FindNeighbors");
