@@ -107,17 +107,23 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
 
         T mj_pro_i = mj * pri / (gradh_i * roi * roi);
 
+        T mj_roi = mj / roi;
         {
             T a = Wi * (mj_pro_i + viscosity_ij * mi_roi);
+            //T a = Wi * (mj_pro_i + viscosity_ij * mj_roi);
+
             T b = mj_roj_Wj * (p[j] / (roj * gradh_j) + viscosity_ij);
 
             momentum_x += a * termA1_i + b * termA1_j;
             momentum_y += a * termA2_i + b * termA2_j;
             momentum_z += a * termA3_i + b * termA3_j;
         }
+        //DEBUG: Change sign of viscosity_ij to negative in energy part
         {
-            T a = Wi * (T(2) * mj_pro_i + viscosity_ij * mi_roi);
-            T b = viscosity_ij * mj_roj_Wj;
+            T a = Wi * (T(2) * mj_pro_i - viscosity_ij * mi_roi); //changed to -visc
+            //T a = Wi * (T(2) * mj_pro_i + viscosity_ij * mj_roi);
+
+            T b = -viscosity_ij * mj_roj_Wj; //changed to -visc
 
             energy += vx_ij * (a * termA1_i + b * termA1_j) + vy_ij * (a * termA2_i + b * termA2_j) +
                       vz_ij * (a * termA3_i + b * termA3_j);
