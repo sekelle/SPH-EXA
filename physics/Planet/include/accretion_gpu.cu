@@ -106,6 +106,7 @@ void applyNewOrderGPU(size_t first, size_t last, T* x, T* scratch, Torder* order
 
 template void applyNewOrderGPU(size_t, size_t, double*, double*, size_t*);
 template void applyNewOrderGPU(size_t, size_t, float*, float*, size_t*);
+template void applyNewOrderGPU(size_t, size_t, unsigned long*, unsigned long*, size_t*);
 
 template<typename Tv, typename Tm, typename Tstar>
 void sumMassAndMomentumGPU(size_t first, size_t last, const Tv* vx, const Tv* vy, const Tv* vz, const Tm* m,
