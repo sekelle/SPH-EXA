@@ -44,7 +44,7 @@ namespace sph
 
 //! @brief limit time-step based on accelerations when gravity is enabled
 template<class Dataset>
-auto  accelerationTimestep(size_t first, size_t last, const Dataset& d)
+auto accelerationTimestep(size_t first, size_t last, const Dataset& d)
 {
     using T = typename Dataset::RealType;
 

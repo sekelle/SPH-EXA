@@ -98,8 +98,11 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
         constexpr T av_alpha     = T(1);
         T           viscosity_ij = T(0.5) * artificial_viscosity(av_alpha, av_alpha, ci, cj, wij);
 
+        // Full signal formula ***
+        T vijsignal = std::sqrt(ci * ci + 2. * wij * wij) + std::sqrt(cj * cj + 2. * wij * wij) - wij;
+        //*****
         // For time-step calculations
-        T vijsignal = ci + cj - T(3) * wij;
+        //T vijsignal = ci + cj - T(3) * wij;
         maxvsignali = (vijsignal > maxvsignali) ? vijsignal : maxvsignali;
 
         auto mj        = m[j];
@@ -110,7 +113,7 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
         T mj_roi = mj / roi;
         {
             T a = Wi * (mj_pro_i + viscosity_ij * mi_roi);
-            //T a = Wi * (mj_pro_i + viscosity_ij * mj_roi);
+            // T a = Wi * (mj_pro_i + viscosity_ij * mj_roi);
 
             T b = mj_roj_Wj * (p[j] / (roj * gradh_j) + viscosity_ij);
 
@@ -118,12 +121,12 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
             momentum_y += a * termA2_i + b * termA2_j;
             momentum_z += a * termA3_i + b * termA3_j;
         }
-        //DEBUG: Change sign of viscosity_ij to negative in energy part
+        // DEBUG: Change sign of viscosity_ij to negative in energy part
         {
-            T a = Wi * (T(2) * mj_pro_i + viscosity_ij * mi_roi); //changed to -visc
-            //T a = Wi * (T(2) * mj_pro_i + viscosity_ij * mj_roi);
+            T a = Wi * (T(2) * mj_pro_i + viscosity_ij * mi_roi); // changed to -visc
+            // T a = Wi * (T(2) * mj_pro_i + viscosity_ij * mj_roi);
 
-            T b = viscosity_ij * mj_roj_Wj; //changed to -visc
+            T b = viscosity_ij * mj_roj_Wj; // changed to -visc
 
             energy += vx_ij * (a * termA1_i + b * termA1_j) + vy_ij * (a * termA2_i + b * termA2_j) +
                       vz_ij * (a * termA3_i + b * termA3_j);

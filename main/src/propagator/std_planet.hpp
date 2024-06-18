@@ -57,7 +57,7 @@ protected:
 
     //! @brief the list of dependent particle fields, these may be used as scratch space during domain sync
     using DependentFields =
-        FieldList<"rho", "p", "c", "ax", "ay", "az", "du", "keyTypeSwap", "c11", "c12", "c13", "c22", "c23", "c33", "nc">;
+        FieldList<"rho", "p", "c", "ax", "ay", "az", "du", "c11", "c12", "c13", "c22", "c23", "c33", "nc">;
 
 public:
     PlanetProp(std::ostream& output, size_t rank, const InitSettings& settings)
@@ -181,8 +181,7 @@ public:
 
         sync(domain, simData);
         timer.step("domain::sync");
-        first = domain.startIndex();
-        last  = domain.endIndex();
+
 
         d.resize(domain.nParticlesWithHalos());
         domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
