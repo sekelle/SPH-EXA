@@ -70,13 +70,7 @@ propagatorFactory(const std::string& choice, bool avClean, std::ostream& output,
         else { return std::make_unique<TurbVeProp<false, DomainType, ParticleDataType>>(output, rank, s); }
     }
     if (choice == "std-planet") { return std::make_unique<PlanetProp<DomainType, ParticleDataType>>(output, rank, s); }
-    if (choice == "ve-planet")
-    {
-        if (avClean)
-            return std::make_unique<PlanetVEProp<true, DomainType, ParticleDataType>>(output, rank, s);
-        else
-            return std::make_unique<PlanetVEProp<false, DomainType, ParticleDataType>>(output, rank, s);
-    }
+
     throw std::runtime_error("Unknown propagator choice: " + choice);
 }
 

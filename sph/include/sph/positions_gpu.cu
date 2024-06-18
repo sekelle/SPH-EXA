@@ -70,7 +70,6 @@ __global__ void computePositionsKernel(size_t first, size_t last, double dt, dou
 
     if (temp != nullptr)
     {
-        printf("WARNING used temp\n");
         Thydro cv    = (constCv < 0) ? idealGasCv(mui[i], gamma) : constCv;
         auto   u_old = temp[i] * cv;
         temp[i]      = energyUpdate(u_old, dt, dt_m1, du[i], du_m1[i]) / cv;

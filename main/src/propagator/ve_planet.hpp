@@ -258,13 +258,13 @@ public:
         first = domain.startIndex();
         last  = domain.endIndex();
 
-        // planet::betaCooling(d, first, last, star);
+         planet::betaCooling(d, first, last, star);
         timer.step("betaCooling");
 
         planet::computeCentralForce(simData.hydro, first, last, star);
         timer.step("computeCentralForce");
-        double dtu = planet::computeHeatingTimestep(d, first, last);
-        computeTimestep(first, last, d, dtu);
+
+        computeTimestep(first, last, d);
         timer.step("Timestep");
         computePositions(first, last, d, domain.box());
         updateSmoothingLength(first, last, d);
@@ -275,7 +275,6 @@ public:
             printf("star position: %lf\t%lf\t%lf\n", star.position[0], star.position[1], star.position[2]);
             printf("star mass: %lf\n", star.m);
             printf("additional pot. erg.: %lf\n", star.potential);
-            printf("heating timestep: %lf\t courant: %lf\n", dtu, d.minDtCourant);
         }
         printf("rank: %d, accreted %zu, removed %zu\n", rank, star.n_accreted_local, star.n_removed_local);
     }

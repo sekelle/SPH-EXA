@@ -44,18 +44,15 @@ namespace sph
 
 //! @brief limit time-step based on accelerations when gravity is enabled
 template<class Dataset>
-auto accelerationTimestep(size_t first, size_t last, const Dataset& d)
+auto  accelerationTimestep(size_t first, size_t last, const Dataset& d)
 {
-    using T    = typename Dataset::RealType;
+    using T = typename Dataset::RealType;
 
-    T min_eps  = d.eps;
     T maxAccSq = 0.0;
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        maxAccSq    = cstone::maxNormSquareGpu(rawPtr(d.devData.ax) + first, rawPtr(d.devData.ay) + first,
-                                               rawPtr(d.devData.az) + first, last - first);
-        auto minmax = cstone::MinMaxGpu<typename Dataset::HydroType>{}(rawPtr(d.devData.h) + first, rawPtr(d.devData.h) + last);
-        min_eps     = std::get<0>(minmax);
+        maxAccSq = cstone::maxNormSquareGpu(rawPtr(d.devData.ax) + first, rawPtr(d.devData.ay) + first,
+                                            rawPtr(d.devData.az) + first, last - first);
     }
     else
     {
@@ -65,12 +62,9 @@ auto accelerationTimestep(size_t first, size_t last, const Dataset& d)
             cstone::Vec3<T> X{d.ax[i], d.ay[i], d.az[i]};
             maxAccSq = std::max(norm2(X), maxAccSq);
         }
-        min_eps = *std::min_element(d.h.begin() + first, d.h.begin() + last);
     }
 
-    return d.etaAcc * std::sqrt(min_eps / std::sqrt(maxAccSq));
-
-    //return d.etaAcc * std::sqrt(d.eps / std::sqrt(maxAccSq));
+    return d.etaAcc * std::sqrt(d.eps / std::sqrt(maxAccSq));
 }
 
 //! @brief limit time-step based on divergence of velocity, this is called in the propagator when Divv is available
@@ -107,6 +101,8 @@ void computeTimestep(size_t first, size_t last, Dataset& d, Ts... extraTimesteps
     T minDtAcc = (d.g != 0.0) ? accelerationTimestep(first, last, d) : INFINITY;
 
     T minDtLoc = std::min({minDtAcc, d.minDtCourant, d.minDtRho, d.maxDtIncrease * d.minDt, extraTimesteps...});
+
+    printf("minDtAcc: %g\nminDtCourant: %g\n minDtLoc: %g\n", minDtAcc, d.minDtCourant, minDtLoc);
 
     T minDtGlobal;
     MPI_Allreduce(&minDtLoc, &minDtGlobal, 1, MpiType<T>{}, MPI_MIN, MPI_COMM_WORLD);

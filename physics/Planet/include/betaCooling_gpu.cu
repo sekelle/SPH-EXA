@@ -28,7 +28,6 @@ __global__ void betaCoolingGPUKernel(size_t first, size_t last, const Tpos* x, c
     const double dist  = sqrt(dist2);
     const double omega = sqrt(g * star_mass / (dist2 * dist));
     du[i] += -u[i] * omega / beta;
-    //if (u[i] < 1e-6) u[i] = 1e-6;
 }
 
 template<typename Tpos, typename Tu, typename Ts, typename Tdu, typename Trho>
