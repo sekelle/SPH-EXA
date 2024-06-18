@@ -83,7 +83,7 @@ __global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<T
         unsigned ncSph =
             1 + traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool)[0];
 
-        constexpr int ncMaxIteration = 999;
+        constexpr int ncMaxIteration = 100000;
         for (int ncIt = 0; ncIt <= ncMaxIteration; ++ncIt)
         {
             if (ncIt == ncMaxIteration)
@@ -102,7 +102,7 @@ __global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<T
             {
                 h[i] = (updateH(ng0, ncSph, h[i]) + h[i] * ncIt) / static_cast<T>(ncIt + 1);
             }
-            else
+            else if (repeat)
             {
                 //Bisection
                 h[i] = (h_upper + h_lower) / 2.;
