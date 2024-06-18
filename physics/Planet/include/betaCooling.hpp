@@ -20,6 +20,7 @@ void betaCoolingImpl(size_t first, size_t last, const Tpos* x, const Tpos* y, co
 
     //Changed if condition (not yet started)
     size_t n_below_floor{};
+    size_t n_nan{};
     for (size_t i = first; i < last; i++)
     {
         if (rho[i] < cooling_rho_limit && u[i] > cooling_floor) {
@@ -39,8 +40,14 @@ void betaCoolingImpl(size_t first, size_t last, const Tpos* x, const Tpos* y, co
             du[i] = std::max(0., du[i]);
             n_below_floor++;
         }
+        if (std::isnan(du[i]))
+            {
+            n_nan++;
+        }
+
     }
     printf("n_below_floor: %zu\n", n_below_floor);
+    if (n_nan > 0) printf("Have nan particles: %zu\n", n_nan);
 }
 
 template<typename Dataset, typename StarData>
