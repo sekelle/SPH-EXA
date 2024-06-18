@@ -58,8 +58,13 @@ HOST_DEVICE_FUN double energyUpdate(double u_old, double dt, double dt_m1, T1 du
     double deltaB = dt + deltaA;
     double u_new  = u_old + du * deltaB - du_m1 * deltaA;
     // To prevent u < 0 (when cooling with GRACKLE is active)
-    if (u_new < 0.) { u_new = u_old * std::exp(u_new * dt / u_old); }
+    //if (u_new < 0.) { u_new = u_old * std::exp(u_new * dt / u_old); }
     if (u_new > 1.5 * u_old) u_new = 1.5 * u_old;
+    if (std::isnan(u_new))
+    {
+        printf("nan in energyUpdate");
+        u_new = 9.3e-6;
+    }
     return u_new;
 }
 
