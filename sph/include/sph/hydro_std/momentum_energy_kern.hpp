@@ -140,11 +140,11 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
             T a = Wi * (T(2) * mj_pro_i);
             energy += vx_ij * a * termA1_i + vy_ij * a * termA2_i + vz_ij * a * termA3_i;
 
-            T a_visc         = Wi * (viscosity_ij * mi_roi);
-            T b_visc         = viscosity_ij * mj_roj_Wj;
-            T viscous_energy = vx_ij * (a_visc * termA1_i + b_visc * termA1_j) +
-                               vy_ij * (a_visc * termA2_i + b_visc * termA2_j) +
-                               vz_ij * (a_visc * termA3_i + b_visc * termA3_j);
+            T a_visc = Wi * (viscosity_ij * mi_roi);
+            T b_visc = viscosity_ij * mj_roj_Wj;
+            T viscous_energy += vx_ij * (a_visc * termA1_i + b_visc * termA1_j) +
+                                vy_ij * (a_visc * termA2_i + b_visc * termA2_j) +
+                                vz_ij * (a_visc * termA3_i + b_visc * termA3_j);
         }
     }
 
