@@ -56,7 +56,7 @@ __global__ void cudaGradP(Tc K, Tc Kcour, unsigned ngmax, cstone::Box<Tc> box, c
                           const Tc* y, const Tc* z, const T* vx, const T* vy, const T* vz, const T* h, const Tm* m,
                           const T* rho, const T* p, const T* c, const T* c11, const T* c12, const T* c13, const T* c22,
                           const T* c23, const T* c33, const T* wh, const T* whd, T* grad_P_x, T* grad_P_y, T* grad_P_z,
-                          Tm1* du, LocalIndex* nidx, TreeNodeIndex* globalPool)
+                          Tm1* du, LocalIndex* nidx, TreeNodeIndex* globalPool, Tm1 *du_visc)
 {
     unsigned laneIdx     = threadIdx.x & (GpuConfig::warpSize - 1);
     unsigned targetIdx   = 0;
@@ -88,7 +88,7 @@ __global__ void cudaGradP(Tc K, Tc Kcour, unsigned ngmax, cstone::Box<Tc> box, c
 
         momentumAndEnergyJLoop<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncCapped, x, y, z, vx, vy,
                                                        vz, h, m, rho, p, c, c11, c12, c13, c22, c23, c33, wh, whd,
-                                                       grad_P_x, grad_P_y, grad_P_z, du, &maxvsignal, &maxkv);
+                                                       grad_P_x, grad_P_y, grad_P_z, du, &maxvsignal, &maxkv, du_visc);
         T dt_visc_i = h[i] * h[i] / maxkv * 0.1;
 
         dt_i = stl::min(dt_i, tsKCourant(maxvsignal, h[i], c[i], Kcour));
@@ -126,7 +126,7 @@ void computeMomentumEnergyStdGpu(size_t startIndex, size_t endIndex, Dataset& d,
         rawPtr(d.devData.h), rawPtr(d.devData.m), rawPtr(d.devData.rho), rawPtr(d.devData.p), rawPtr(d.devData.c),
         rawPtr(d.devData.c11), rawPtr(d.devData.c12), rawPtr(d.devData.c13), rawPtr(d.devData.c22),
         rawPtr(d.devData.c23), rawPtr(d.devData.c33), rawPtr(d.devData.wh), rawPtr(d.devData.whd), rawPtr(d.devData.ax),
-        rawPtr(d.devData.ay), rawPtr(d.devData.az), rawPtr(d.devData.du), nidxPool, traversalPool);
+        rawPtr(d.devData.ay), rawPtr(d.devData.az), rawPtr(d.devData.du), nidxPool, traversalPool, rawPtr(d.devData.du_visc));
 
     checkGpuErrors(cudaGetLastError());
 

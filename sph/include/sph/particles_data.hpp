@@ -203,23 +203,25 @@ public:
      * The length of these arrays equals the local number of particles including halos
      * if the field is active and is zero if the field is inactive.
      */
-    FieldVector<RealType>  x, y, z;                            // Positions
-    FieldVector<XM1Type>   x_m1, y_m1, z_m1;                   // Difference between current and previous positions
-    FieldVector<HydroType> vx, vy, vz;                         // Velocities
-    FieldVector<HydroType> rho;                                // Density
-    FieldVector<RealType>  temp;                               // Temperature
-    FieldVector<RealType>  u;                                  // Internal Energy
-    FieldVector<HydroType> p;                                  // Pressure
-    FieldVector<HydroType> prho;                               // p / (kx * m^2 * gradh)
-    FieldVector<HydroType> tdpdTrho;                           // temp * dp/dT * prho
-    FieldVector<HydroType> h;                                  // Smoothing Length
-    FieldVector<Tmass>     m;                                  // Mass
-    FieldVector<HydroType> c;                                  // Speed of sound
-    FieldVector<HydroType> cv;                                 // Specific heat
-    FieldVector<HydroType> mue, mui;                           // mean molecular weight (electrons, ions)
-    FieldVector<HydroType> divv, curlv;                        // Div(velocity), Curl(velocity)
-    FieldVector<HydroType> ax, ay, az;                         // acceleration
-    FieldVector<RealType>  du;                                 // energy rate of change (du/dt)
+    FieldVector<RealType>  x, y, z;          // Positions
+    FieldVector<XM1Type>   x_m1, y_m1, z_m1; // Difference between current and previous positions
+    FieldVector<HydroType> vx, vy, vz;       // Velocities
+    FieldVector<HydroType> rho;              // Density
+    FieldVector<RealType>  temp;             // Temperature
+    FieldVector<RealType>  u;                // Internal Energy
+    FieldVector<HydroType> p;                // Pressure
+    FieldVector<HydroType> prho;             // p / (kx * m^2 * gradh)
+    FieldVector<HydroType> tdpdTrho;         // temp * dp/dT * prho
+    FieldVector<HydroType> h;                // Smoothing Length
+    FieldVector<Tmass>     m;                // Mass
+    FieldVector<HydroType> c;                // Speed of sound
+    FieldVector<HydroType> cv;               // Specific heat
+    FieldVector<HydroType> mue, mui;         // mean molecular weight (electrons, ions)
+    FieldVector<HydroType> divv, curlv;      // Div(velocity), Curl(velocity)
+    FieldVector<HydroType> ax, ay, az;       // acceleration
+    FieldVector<RealType>  du;               // energy rate of change (du/dt)
+    FieldVector<RealType>  du_visc;          // energy rate of change due to viscosity(du/dt)
+
     FieldVector<XM1Type>   du_m1;                              // previous energy rate of change (du/dt)
     FieldVector<HydroType> c11, c12, c13, c22, c23, c33;       // IAD components
     FieldVector<HydroType> alpha;                              // AV coeficient
@@ -243,10 +245,10 @@ public:
      * Name of each field as string for use e.g in HDF5 output. Order has to correspond to what's returned by data().
      */
     inline static constexpr std::array fieldNames{
-        "x",     "y",        "z",    "x_m1", "y_m1", "z_m1", "vx",   "vy",   "vz",   "rho",   "u",    "p",
-        "prho",  "tdpdTrho", "h",    "m",    "c",    "ax",   "ay",   "az",   "du",   "du_m1", "c11",  "c12",
-        "c13",   "c22",      "c23",  "c33",  "mue",  "mui",  "temp", "cv",   "xm",   "kx",    "divv", "curlv",
-        "alpha", "gradh",    "keys", "nc",   "dV11", "dV12", "dV13", "dV22", "dV23", "dV33"};
+        "x",     "y",        "z",     "x_m1", "y_m1", "z_m1", "vx",   "vy",   "vz",   "rho",     "u",     "p",
+        "prho",  "tdpdTrho", "h",     "m",    "c",    "ax",   "ay",   "az",   "du",   "du_visc", "du_m1", "c11",
+        "c12",   "c13",      "c22",   "c23",  "c33",  "mue",  "mui",  "temp", "cv",   "xm",      "kx",    "divv",
+        "curlv", "alpha",    "gradh", "keys", "nc",   "dV11", "dV12", "dV13", "dV22", "dV23",    "dV33"};
 
     //! @brief dataset prefix to be prepended to fieldNames for structured output
     static const inline std::string prefix{};
@@ -261,8 +263,8 @@ public:
     auto dataTuple()
     {
         auto ret = std::tie(x, y, z, x_m1, y_m1, z_m1, vx, vy, vz, rho, u, p, prho, tdpdTrho, h, m, c, ax, ay, az, du,
-                            du_m1, c11, c12, c13, c22, c23, c33, mue, mui, temp, cv, xm, kx, divv, curlv, alpha, gradh,
-                            keys, nc, dV11, dV12, dV13, dV22, dV23, dV33);
+                            du_visc, du_m1, c11, c12, c13, c22, c23, c33, mue, mui, temp, cv, xm, kx, divv, curlv,
+                            alpha, gradh, keys, nc, dV11, dV12, dV13, dV22, dV23, dV33);
 #if defined(__clang__) || __GNUC__ > 11
         static_assert(std::tuple_size_v<decltype(ret)> == fieldNames.size());
 #endif

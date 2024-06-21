@@ -65,7 +65,9 @@ void computeMomentumEnergyStdImpl(size_t startIndex, size_t endIndex, Dataset& d
     const auto* c23 = d.c23.data();
     const auto* c33 = d.c33.data();
 
-    auto* du       = d.du.data();
+    auto* du      = d.du.data();
+    auto* du_visc = d.du_visc.data();
+
     auto* grad_P_x = d.ax.data();
     auto* grad_P_y = d.ay.data();
     auto* grad_P_z = d.az.data();
@@ -86,7 +88,7 @@ void computeMomentumEnergyStdImpl(size_t startIndex, size_t endIndex, Dataset& d
         unsigned ncCapped = std::min(neighborsCount[i] - 1, d.ngmax);
         momentumAndEnergyJLoop(i, d.K, box, neighbors + d.ngmax * ni, ncCapped, x, y, z, vx, vy, vz, h, m, rho, p, c,
                                c11, c12, c13, c22, c23, c33, wh, whd, grad_P_x, grad_P_y, grad_P_z, du, &maxvsignal,
-                               &maxkv);
+                               &maxkv, du_visc);
 
         T dt_i      = tsKCourant(maxvsignal, h[i], c[i], d.Kcour);
         minDt       = std::min(minDt, dt_i);

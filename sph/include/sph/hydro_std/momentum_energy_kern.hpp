@@ -15,7 +15,8 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
                        unsigned neighborsCount, const Tc* x, const Tc* y, const Tc* z, const T* vx, const T* vy,
                        const T* vz, const T* h, const Tm* m, const T* rho, const T* p, const T* c, const T* c11,
                        const T* c12, const T* c13, const T* c22, const T* c23, const T* c33, const T* wh,
-                       const T* /*whd*/, T* grad_P_x, T* grad_P_y, T* grad_P_z, Tm1* du, T* maxvsignal, T* maxkv)
+                       const T* /*whd*/, T* grad_P_x, T* grad_P_y, T* grad_P_z, Tm1* du, T* maxvsignal, T* maxkv,
+                       Tm1* du_visc)
 {
     constexpr T gradh_i = 1.0;
     constexpr T gradh_j = 1.0;
@@ -39,7 +40,7 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
 
     T maxvsignali = 0.0;
     T maxkvi      = 0.;
-    T momentum_x = 0.0, momentum_y = 0.0, momentum_z = 0.0, energy = 0.0;
+    T momentum_x = 0.0, momentum_y = 0.0, momentum_z = 0.0, energy = 0.0, viscous_energy = 0.0;
 
     auto c11i = c11[i];
     auto c12i = c12[i];
@@ -95,7 +96,7 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
         auto roj = rho[j];
         auto cj  = c[j];
 
-        T           wij          = rv / dist;
+        T           wij          = rv / dist; // needs softening?
         constexpr T av_alpha     = T(1);
         T           viscosity_ij = T(0.5) * artificial_viscosity(av_alpha, av_alpha, ci, cj, wij);
 
@@ -128,24 +129,34 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
         }
         // DEBUG: Change sign of viscosity_ij to negative in energy part
         {
-            T a = Wi * (T(2) * mj_pro_i + viscosity_ij * mi_roi); // changed to -visc
-            // T a = Wi * (T(2) * mj_pro_i + viscosity_ij * mj_roi);
+            //            T a = Wi * (T(2) * mj_pro_i + viscosity_ij * mi_roi); // changed to -visc
+            //            // T a = Wi * (T(2) * mj_pro_i + viscosity_ij * mj_roi);
+            //
+            //            T b = viscosity_ij * mj_roj_Wj; // changed to -visc
+            //
+            //            energy += vx_ij * (a * termA1_i + b * termA1_j) + vy_ij * (a * termA2_i + b * termA2_j) +
+            //                      vz_ij * (a * termA3_i + b * termA3_j);
 
-            T b = viscosity_ij * mj_roj_Wj; // changed to -visc
+            T a = Wi * (T(2) * mj_pro_i);
+            energy += vx_ij * a * termA1_i + vy_ij * a * termA2_i + vz_ij * a * termA3_i;
 
-            energy += vx_ij * (a * termA1_i + b * termA1_j) + vy_ij * (a * termA2_i + b * termA2_j) +
-                      vz_ij * (a * termA3_i + b * termA3_j);
+            T a_visc         = Wi * (viscosity_ij * mi_roi);
+            T b_visc         = viscosity_ij * mj_roj_Wj;
+            T viscous_energy = vx_ij * (a_visc * termA1_i + b_visc * termA1_j) +
+                               vy_ij * (a_visc * termA2_i + b_visc * termA2_j) +
+                               vz_ij * (a_visc * termA3_i + b_visc * termA3_j);
         }
     }
 
     // with the choice of calculating coordinate (r) and velocity (v_ij) differences as i - j,
     // we add the negative sign only here at the end instead of to termA123_ij in each iteration
-    du[i]       = -K * Tm1(0.5) * energy;
+    du[i]       = -K * Tm1(0.5) * energy - K * Tm1(0.5) * viscous_energy;
+    du_visc[i]  = -K * Tm1(0.5) * viscous_energy;
     grad_P_x[i] = K * momentum_x;
     grad_P_y[i] = K * momentum_y;
     grad_P_z[i] = K * momentum_z;
     *maxvsignal = maxvsignali;
-    *maxkv = maxkvi;
+    *maxkv      = maxkvi;
 }
 
 } // namespace sph
