@@ -100,15 +100,15 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
         constexpr T av_alpha     = T(1);
         T           viscosity_ij = T(0.5) * artificial_viscosity(av_alpha, av_alpha, ci, cj, wij);
 
-       // T v_norm   = std::sqrt(vx_ij * vx_ij + vy_ij * vy_ij + vz_ij * vz_ij);
-       // T kin_visc = av_alpha * ci * hi + 2. * hi * hi * v_norm / dist;
-        //maxkvi     = (kin_visc > maxkvi) ? kin_visc : maxkvi;
+        // T v_norm   = std::sqrt(vx_ij * vx_ij + vy_ij * vy_ij + vz_ij * vz_ij);
+        // T kin_visc = av_alpha * ci * hi + 2. * hi * hi * v_norm / dist;
+        // maxkvi     = (kin_visc > maxkvi) ? kin_visc : maxkvi;
 
         // Full signal formula ***
-        //T vijsignal = std::sqrt(ci * ci + 2. * wij * wij) + std::sqrt(cj * cj + 2. * wij * wij) - wij;
+        // T vijsignal = std::sqrt(ci * ci + 2. * wij * wij) + std::sqrt(cj * cj + 2. * wij * wij) - wij;
         //*****
         // For time-step calculations
-         T vijsignal = ci + cj - T(3) * wij;
+        T vijsignal = ci + cj - T(3) * wij;
         maxvsignali = (vijsignal > maxvsignali) ? vijsignal : maxvsignali;
 
         auto mj        = m[j];
@@ -150,8 +150,8 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
 
     // with the choice of calculating coordinate (r) and velocity (v_ij) differences as i - j,
     // we add the negative sign only here at the end instead of to termA123_ij in each iteration
-    du[i]       = -K * Tm1(0.5) * energy - K * Tm1(0.5) * viscous_energy;
-    du_visc[i]  = -K * Tm1(0.5) * viscous_energy;
+    du[i]       = -K * Tm1(0.5) * energy + stl::max(0., -K * Tm1(0.5) * viscous_energy);
+    du_visc[i]  = stl::max(0., -K * Tm1(0.5) * viscous_energy);
     grad_P_x[i] = K * momentum_x;
     grad_P_y[i] = K * momentum_y;
     grad_P_z[i] = K * momentum_z;
