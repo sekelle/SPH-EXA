@@ -151,7 +151,6 @@ public:
 
     void computeForces(DomainType& domain, DataType& simData)
     {
-        timer.start();
 
         pmReader.start();
 
@@ -234,6 +233,7 @@ public:
 
     void step(DomainType& domain, DataType& simData) override
     {
+        timer.start();
         auto& d = simData.hydro;
 
         size_t first = domain.startIndex();
@@ -252,13 +252,14 @@ public:
         planet::exchangeAndAccreteOnStar(star, d.minDt_m1, rank);
 
         domain.setEndIndex(last - star.n_accreted_local - star.n_removed_local);
+        timer.step("accreteParticles");
 
         computeForces(domain, simData);
 
         first = domain.startIndex();
         last  = domain.endIndex();
 
-         planet::betaCooling(d, first, last, star);
+        planet::betaCooling(d, first, last, star);
         timer.step("betaCooling");
 
         planet::computeCentralForce(simData.hydro, first, last, star);
@@ -270,6 +271,8 @@ public:
         updateSmoothingLength(first, last, d);
         timer.step("UpdateQuantities");
         planet::computeAndExchangeStarPosition(star, d.minDt, d.minDt_m1, rank);
+        timer.step("computeAndExchangeStarPosition");
+
         if (rank == 0)
         {
             printf("star position: %lf\t%lf\t%lf\n", star.position[0], star.position[1], star.position[2]);

@@ -24,7 +24,6 @@ void betaCoolingImpl(size_t first, size_t last, const Tpos* x, const Tpos* y, co
     {
         if (rho[i] < cooling_rho_limit && u[i] > cooling_floor)
         {
-
             const double dx    = x[i] - star_pos[0];
             const double dy    = y[i] - star_pos[1];
             const double dz    = z[i] - star_pos[2];
