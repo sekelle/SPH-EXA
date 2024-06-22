@@ -15,8 +15,7 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
                        unsigned neighborsCount, const Tc* x, const Tc* y, const Tc* z, const T* vx, const T* vy,
                        const T* vz, const T* h, const Tm* m, const T* rho, const T* p, const T* c, const T* c11,
                        const T* c12, const T* c13, const T* c22, const T* c23, const T* c33, const T* wh,
-                       const T* /*whd*/, T* grad_P_x, T* grad_P_y, T* grad_P_z, Tm1* du, T* maxvsignal,
-                       Tm1* du_visc)
+                       const T* /*whd*/, T* grad_P_x, T* grad_P_y, T* grad_P_z, Tm1* du, T* maxvsignal)
 {
     constexpr T gradh_i = 1.0;
     constexpr T gradh_j = 1.0;
@@ -151,7 +150,7 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
     // with the choice of calculating coordinate (r) and velocity (v_ij) differences as i - j,
     // we add the negative sign only here at the end instead of to termA123_ij in each iteration
     du[i]       = -K * Tm1(0.5) * energy + stl::max(0., -K * Tm1(0.5) * viscous_energy);
-    du_visc[i]  = stl::max(0., -K * Tm1(0.5) * viscous_energy);
+  //  du_visc[i]  = stl::max(0., -K * Tm1(0.5) * viscous_energy);
     grad_P_x[i] = K * momentum_x;
     grad_P_y[i] = K * momentum_y;
     grad_P_z[i] = K * momentum_z;
