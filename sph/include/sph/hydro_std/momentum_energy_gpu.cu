@@ -88,7 +88,7 @@ __global__ void cudaGradP(Tc K, Tc Kcour, unsigned ngmax, cstone::Box<Tc> box, c
 
         momentumAndEnergyJLoop<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncCapped, x, y, z, vx, vy,
                                                        vz, h, m, rho, p, c, c11, c12, c13, c22, c23, c33, wh, whd,
-                                                       grad_P_x, grad_P_y, grad_P_z, du, &maxvsignal, &maxkv, du_visc);
+                                                       grad_P_x, grad_P_y, grad_P_z, du, &maxvsignal, du_visc);
         //T dt_visc_i = h[i] * h[i] / maxkv * 0.1;
 
         dt_i = stl::min(dt_i, tsKCourant(maxvsignal, h[i], c[i], Kcour));
