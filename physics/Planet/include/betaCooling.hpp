@@ -76,22 +76,23 @@ void betaCooling(Dataset& d, size_t startIndex, size_t endIndex, const StarData&
 }
 
 template<typename Dataset, typename StarData>
-double duTimestepAndTempFloor(Dataset& d, size_t startIndex, size_t endIndex, const StarData& star)
+void duTimestepAndTempFloor(Dataset& d, size_t startIndex, size_t endIndex, StarData& star)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
         transferToHost(d, startIndex, endIndex, {"du", "u", "adjust"});
 
-        auto dt = duTimestepAndTempFloorImpl(startIndex, endIndex, d.du.data(), d.u.data(), d.du_m1.data(),
+        auto dt_u = duTimestepAndTempFloorImpl(startIndex, endIndex, d.du.data(), d.u.data(), d.du_m1.data(),
                                              star.u_floor, star.K_u);
 
         transferToDevice(d, startIndex, endIndex, {"du", "u", "adjust"});
-        return dt;
+        star.t_du = dt_u;
     }
     else
     {
-        return duTimestepAndTempFloorImpl(startIndex, endIndex, d.du.data(), d.u.data(), d.du_m1.data(), star.u_floor,
+        auto dt_u = duTimestepAndTempFloorImpl(startIndex, endIndex, d.du.data(), d.u.data(), d.du_m1.data(), star.u_floor,
                                           star.K_u);
+        star.t_du = dt_u;
     }
 }
 } // namespace planet

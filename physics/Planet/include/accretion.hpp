@@ -51,8 +51,8 @@ void computeNewOrder(size_t first, size_t last, Dataset& d, StarData& star)
 
 //! @brief Apply the new particle ordering to all the conserved fields. Dependent fields are used as scratch buffer. The
 //! particles are ordered as follows: active particles, particles to be accreted, other particles to be removed
-template<typename ConservedFields, typename DependentFields, typename Dataset, typename StarData>
-void applyNewOrder(size_t first, size_t last, Dataset& d, StarData& star)
+template<typename ConservedFields, typename DependentFields, typename Dataset>
+void applyNewOrder(size_t first, size_t last, Dataset& d)
 {
     using SortFields = decltype(util::FieldList<"x", "y", "z", "h", "m">{} + ConservedFields{});
     auto sortVectors = get<SortFields>(d);

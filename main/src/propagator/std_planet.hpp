@@ -44,6 +44,7 @@ protected:
         MultipoleType, DomainType, typename DataType::HydroData>;
 
     MHolder_t mHolder_;
+    GroupData<Acc> groups_;
 
     StarData star;
     // std::array<double, 3> stellar_position;
@@ -58,6 +59,7 @@ protected:
     //! @brief the list of dependent particle fields, these may be used as scratch space during domain sync
     using DependentFields =
         FieldList<"rho", "p", "c", "ax", "ay", "az", "du", "c11", "c12", "c13", "c22", "c23", "c33", "nc">;
+    double t_du{};
 
 public:
     PlanetProp(std::ostream& output, size_t rank, const InitSettings& settings)
@@ -119,16 +121,26 @@ public:
         d.treeView = domain.octreeProperties();
     }
 
-    void computeForces(DomainType& domain, DataType& simData)
+    void computeForces(DomainType& domain, DataType& simData) override
     {
+        timer.start();
+
+        sync(domain, simData);
+        timer.step("domain::sync");
+
+        auto& d = simData.hydro;
+        d.resize(domain.nParticlesWithHalos());
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
-        auto&  d     = simData.hydro;
+
+        domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
+
         resizeNeighbors(d, domain.nParticles() * d.ngmax);
         findNeighborsSfc(first, last, d, domain.box());
+        computeGroups(first, last, d, domain.box(), groups_);
         timer.step("FindNeighbors");
 
-        computeDensity(first, last, d, domain.box());
+        computeDensity(groups_.view(), d, domain.box());
         timer.step("Density");
         computeEOS_HydroStd(first, last, d);
         timer.step("EquationOfState");
@@ -136,80 +148,63 @@ public:
         domain.exchangeHalos(get<"vx", "vy", "vz", "rho", "p", "c">(d), get<"ax">(d), get<"ay">(d));
         timer.step("mpi::synchronizeHalos");
 
-        computeIAD(first, last, d, domain.box());
+        computeIAD(groups_.view(), d, domain.box());
         timer.step("IAD");
 
         domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33">(d), get<"ax">(d), get<"ay">(d));
         timer.step("mpi::synchronizeHalos");
 
-        computeMomentumEnergySTD(first, last, d, domain.box());
+        computeMomentumEnergySTD(groups_.view(), d, domain.box());
         timer.step("MomentumEnergyIAD");
 
         if (d.g != 0.0)
         {
+            auto groups = mHolder_.computeSpatialGroups(d, domain);
             mHolder_.upsweep(d, domain);
             timer.step("Upsweep");
-            mHolder_.traverse(d, domain);
+            mHolder_.traverse(groups, d, domain);
             timer.step("Gravity");
         }
+        planet::betaCooling(d, first, last, star);
+        timer.step("betaCooling");
+
+        planet::duTimestepAndTempFloor(simData.hydro, first, last, star);
+
+        planet::computeCentralForce(simData.hydro, first, last, star);
+        timer.step("computeCentralForce");
     }
 
-    void step(DomainType& domain, DataType& simData) override
+    void integrate(DomainType& domain, DataType& simData) override
     {
-        timer.start();
-        auto& d = simData.hydro;
-
-        using KeyType = typename DataType::HydroData::KeyType;
-        int rank = 0;
-        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
+        auto&  d     = simData.hydro;
 
-        //Accretion uses the keys field to mark particles that have to be removed
+        computeTimestep(first, last, d, star.t_du);
+        timer.step("Timestep");
+
+        computePositions(groups_.view(), d, domain.box(), d.minDt, {float(d.minDt_m1)});
+        updateSmoothingLength(groups_.view(), d);
+        timer.step("UpdateQuantities");
+
+        planet::computeAndExchangeStarPosition(star, d.minDt, d.minDt_m1, Base::rank_);
+        timer.step("computeAndExchangeStarPosition");
+
+        // Accretion uses the keys field to mark particles that have to be removed
         fill(get<"keys">(d), first, last, KeyType{0});
 
         planet::computeAccretionCondition(first, last, d, star);
         planet::computeNewOrder(first, last, d, star);
-        planet::applyNewOrder<ConservedFields, DependentFields>(first, last, d, star);
+        planet::applyNewOrder<ConservedFields, DependentFields>(first, last, d);
 
         planet::sumAccretedMassAndMomentum<DependentFields>(first, last, d, star);
-        planet::exchangeAndAccreteOnStar(star, d.minDt_m1, rank);
+        planet::exchangeAndAccreteOnStar(star, d.minDt_m1, Base::rank_);
 
         domain.setEndIndex(last - star.n_accreted_local - star.n_removed_local);
 
         timer.step("accreteParticles");
 
-        sync(domain, simData);
-        timer.step("domain::sync");
-
-        d.resize(domain.nParticlesWithHalos());
-        domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
-        first = domain.startIndex();
-        last  = domain.endIndex();
-
-        computeForces(domain, simData);
-
-        planet::betaCooling(d, first, last, star);
-        timer.step("betaCooling");
-
-        const auto t_du = planet::duTimestepAndTempFloor(simData.hydro, first, last, star);
-
-        planet::computeCentralForce(simData.hydro, first, last, star);
-        timer.step("computeCentralForce");
-
-        computeTimestep(first, last, d, t_du);
-
-        timer.step("Timestep");
-
-        computePositions(first, last, d, domain.box());
-        updateSmoothingLength(first, last, d);
-        timer.step("UpdateQuantities");
-
-        planet::computeAndExchangeStarPosition(star, d.minDt, d.minDt_m1, rank);
-        timer.step("computeAndExchangeStarPosition");
-
-        if (rank == 0)
+        if (Base::rank_ == 0)
         {
             printf("star position: %lf\t%lf\t%lf\n", star.position[0], star.position[1], star.position[2]);
             printf("star mass: %lf\n", star.m);

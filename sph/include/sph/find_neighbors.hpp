@@ -64,8 +64,9 @@ void findNeighborsSfc(size_t startIndex, size_t endIndex, Dataset& d, const csto
     if (d.ng0 > d.ngmax) { throw std::runtime_error("ng0 should be smaller than ngmax\n"); }
     if (d.ngmin > d.ng0) { throw std::runtime_error("ngmin should be smaller than ng0\n"); }
 
-    findNeighborsSph(d.x.data(), d.y.data(), d.z.data(), d.h.data(), startIndex, endIndex, box, d.treeView.nsView(),
-                     d.ng0, d.ngmax, d.ngmin, d.neighbors.data(), d.nc.data() + startIndex);
+
+    findNeighborsSph(d.x.data(), d.y.data(), d.z.data(), d.h.data(), startIndex, endIndex, box, d.treeView, d.ng0,
+                     d.ngmax, d.ngmin, d.neighbors.data(), d.nc.data() + startIndex);
 }
 
 } // namespace sph

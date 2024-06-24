@@ -68,4 +68,5 @@ struct StarData
     size_t                n_removed_local{};
     double                m_accreted_local{};
     std::array<double, 3> p_accreted_local{};
+    double                t_du{};
 };
