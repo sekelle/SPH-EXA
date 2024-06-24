@@ -76,11 +76,11 @@ protected:
      *
      * x, y, z, h and m are automatically considered conserved and must not be specified in this list
      */
-    using ConservedFields = FieldList<"u", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "du_m1", "alpha", "adjust">;
+    using ConservedFields = FieldList<"u", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "du_m1", "alpha">;
 
     //! @brief list of dependent fields, these may be used as scratch space during domain sync
-    using DependentFields_ =
-        FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33", "xm", "kx", "nc", "rho", "p", "key_scratch">;
+    using DependentFields_ = FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33",
+                                       "xm", "kx", "nc", "rho", "p">;
 
     //! @brief velocity gradient fields will only be allocated when avClean is true
     using GradVFields = FieldList<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33">;
@@ -165,10 +165,6 @@ public:
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
-        //transferToHost(d, first, first + 1, {"m"});
-        //fill(get<"m">(d), 0, first, d.m[first]);
-        //fill(get<"m">(d), last, domain.nParticlesWithHalos(), d.m[first]);
-
         findNeighborsSfc(first, last, d, domain.box());
         timer.step("FindNeighbors");
         pmReader.step();
@@ -244,7 +240,6 @@ public:
         fill(get<"keys">(d), first, last, KeyType{0});
 
         planet::computeAccretionCondition(first, last, d, star);
-
         planet::computeNewOrder(first, last, d, star);
         planet::applyNewOrder<ConservedFields, DependentFields>(first, last, d, star);
 
@@ -252,6 +247,7 @@ public:
         planet::exchangeAndAccreteOnStar(star, d.minDt_m1, rank);
 
         domain.setEndIndex(last - star.n_accreted_local - star.n_removed_local);
+
         timer.step("accreteParticles");
 
         computeForces(domain, simData);
@@ -278,8 +274,8 @@ public:
             printf("star position: %lf\t%lf\t%lf\n", star.position[0], star.position[1], star.position[2]);
             printf("star mass: %lf\n", star.m);
             printf("additional pot. erg.: %lf\n", star.potential);
+            printf("rank 0: accreted %zu, removed %zu\n", star.n_accreted_local, star.n_removed_local);
         }
-        printf("rank: %d, accreted %zu, removed %zu\n", rank, star.n_accreted_local, star.n_removed_local);
     }
 
     void saveFields(IFileWriter* writer, size_t first, size_t last, DataType& simData,
@@ -316,12 +312,12 @@ public:
         d.devData.release("ax", "ay", "az");
 
         // second output pass: write temporary quantities produced by the EOS
-        d.acquire(/*"rho", "p", */"gradh");
-        d.devData.acquire(/*"rho", "p", */"gradh");
+        d.acquire(/*"rho", "p", */ "gradh");
+        d.devData.acquire(/*"rho", "p", */ "gradh");
         computeEOS(first, last, d);
         output();
-        d.devData.release(/*"rho", "p", */"gradh");
-        d.release(/*"rho", "p", */"gradh");
+        d.devData.release(/*"rho", "p", */ "gradh");
+        d.release(/*"rho", "p", */ "gradh");
 
         // third output pass: curlv and divv
         d.acquire("divv", "curlv");

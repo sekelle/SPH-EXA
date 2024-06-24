@@ -47,23 +47,3 @@ void betaCoolingGPU(size_t first, size_t last, const Tpos* x, const Tpos* y, con
 
 template void betaCoolingGPU(size_t, size_t, const double*, const double*, const double* z, const double*, double*, double,
                              const double*, double, double, const float*, double, float);
-
-template<typename Tu, typename Tdu>
-struct f
-{
-    __device__ double operator()(Tu u, Tdu du) { return abs(0.25 * u / du); }
-};
-
-template<typename Tu, typename Tdu>
-double computeHeatingTimestepGPU(size_t first, size_t last, const Tu* u, const Tdu* du)
-{
-    return 0.;
-    /*  double minDt = 0.25 * thrust::transform_reduce(u + first, u + last, du + first,
-                                                     std::numeric_limits<double>::infinity(), f<Tu, Tdu>{},
-                                                     thrust::minimum<double>());
-
-      checkGpuErrors(cudaDeviceSynchronize());
-      return minDt;*/
-}
-
-template double computeHeatingTimestepGPU(size_t, size_t, const double*, const double*);

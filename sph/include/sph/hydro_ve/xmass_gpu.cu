@@ -54,7 +54,7 @@ namespace cuda
 __device__ bool nc_h_convergenceFailure = false;
 
 template<class Tc, class Tm, class T, class KeyType>
-__global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<Tc> box,
+__global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, unsigned ngmin, const cstone::Box<Tc> box,
                          const cstone::LocalIndex* groups, cstone::LocalIndex numGroups,
                          const cstone::OctreeNsView<Tc, KeyType> tree, unsigned* nc, const Tc* x, const Tc* y,
                          const Tc* z, T* h, const Tm* m, const T* wh, const T* whd, T* xm, cstone::LocalIndex* nidx,
@@ -66,9 +66,8 @@ __global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<T
 
     cstone::LocalIndex* neighborsWarp = nidx + ngmax * TravConfig::targetSize * warpIdxGrid;
 
-    T              h_upper{5.};
-    T              h_lower{0.};
-    const unsigned ngmin = ng0 - 5;
+    T h_upper(box.maxExtent());
+    T h_lower{0.};
 
     while (true)
     {
@@ -90,9 +89,8 @@ __global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<T
         {
             if (ncIt == ncMaxIteration) { nc_h_convergenceFailure = true; }
 
-            // bool tooMany   = (ncSph - 1) > ngmax;
+            bool tooMany   = (ncSph - 1) > ngmax;
             bool notEnough = ncSph < ngmin;
-            bool tooMany   = (ncSph - 1) > ng0 + 5;
             bool repeat    = (notEnough || tooMany) && i < bodyEnd;
 
             h_upper = tooMany ? h[i] : h_upper;
@@ -132,9 +130,10 @@ void computeXMass(size_t startIndex, size_t endIndex, Dataset& d, const cstone::
 
     unsigned numGroups = d.devData.targetGroups.size() - 1;
     xmassGpu<<<numBlocks, TravConfig::numThreads>>>(
-        d.K, d.ng0, d.ngmax, box, rawPtr(d.devData.targetGroups), numGroups, d.treeView.nsView(), rawPtr(d.devData.nc),
-        rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.h), rawPtr(d.devData.m),
-        rawPtr(d.devData.wh), rawPtr(d.devData.whd), rawPtr(d.devData.xm), nidxPool, traversalPool);
+        d.K, d.ng0, d.ngmax, d.ngmin, box, rawPtr(d.devData.targetGroups), numGroups, d.treeView.nsView(),
+        rawPtr(d.devData.nc), rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.h),
+        rawPtr(d.devData.m), rawPtr(d.devData.wh), rawPtr(d.devData.whd), rawPtr(d.devData.xm), nidxPool,
+        traversalPool);
     checkGpuErrors(cudaDeviceSynchronize());
 
     NcStats::type stats[NcStats::numStats];

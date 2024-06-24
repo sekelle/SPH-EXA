@@ -37,16 +37,12 @@ void betaCoolingImpl(size_t first, size_t last, const Tpos* x, const Tpos* y, co
 
 template<std::floating_point Tt>
 Tt duTimestepAndTempFloorImpl(size_t first, size_t last, std::floating_point auto* du, std::floating_point auto* u,
-                              const std::floating_point auto* du_m1, std::integral auto* adjust,
-                              std::floating_point auto u_floor, std::floating_point auto du_adjust, Tt k_u)
+                              const std::floating_point auto* du_m1, std::floating_point auto u_floor, Tt k_u)
 {
     size_t n_below_floor{};
-    size_t n_nan;
-    size_t n_adjust{};
     Tt     duTimestepMin = std::numeric_limits<Tt>::infinity();
 
-#pragma omp parallel for reduction(min : duTimestepMin) reduction(+ : n_below_floor) reduction(+ : n_nan)              \
-    reduction(+ : n_adjust)
+#pragma omp parallel for reduction(min : duTimestepMin) reduction(+ : n_below_floor)
     for (size_t i = first; i < last; i++)
     {
         if (u[i] < u_floor)
@@ -55,28 +51,11 @@ Tt duTimestepAndTempFloorImpl(size_t first, size_t last, std::floating_point aut
             du[i] = std::max(0., du[i]);
             n_below_floor++;
         }
-        if (std::isnan(du[i])) { n_nan++; }
-        if (du[i] > du_adjust)
-        {
-            du[i] = du_adjust;
-            adjust[i]++;
-            n_adjust++;
-        }
-        else if (du[i] < -du_adjust)
-        {
-            du[i] = -du_adjust;
-            adjust[i]++;
-            n_adjust++;
-        }
+
         Tt duTimestep = k_u * std::abs(u[i] / du[i]);
         duTimestepMin = std::min(duTimestepMin, duTimestep);
     }
-    printf("n_below_floor: %zu\nn_adjust: %zu\n", n_below_floor, n_adjust);
-    if (n_nan > 0)
-    {
-        printf("n_nan: %zu\n", n_nan);
-        throw std::runtime_error("NaN in du");
-    }
+    printf("n_below_floor: %zu\n", n_below_floor);
     return duTimestepMin;
 }
 
@@ -104,15 +83,15 @@ double duTimestepAndTempFloor(Dataset& d, size_t startIndex, size_t endIndex, co
         transferToHost(d, startIndex, endIndex, {"du", "u", "adjust"});
 
         auto dt = duTimestepAndTempFloorImpl(startIndex, endIndex, d.du.data(), d.u.data(), d.du_m1.data(),
-                                             d.adjust.data(), star.u_floor, star.du_adjust, star.K_u);
+                                             star.u_floor, star.K_u);
 
         transferToDevice(d, startIndex, endIndex, {"du", "u", "adjust"});
         return dt;
     }
     else
     {
-        return duTimestepAndTempFloorImpl(startIndex, endIndex, d.du.data(), d.u.data(), d.du_m1.data(),
-                                          d.adjust.data(), star.u_floor, star.du_adjust, star.K_u);
+        return duTimestepAndTempFloorImpl(startIndex, endIndex, d.du.data(), d.u.data(), d.du_m1.data(), star.u_floor,
+                                          star.K_u);
     }
 }
 } // namespace planet

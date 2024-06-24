@@ -66,7 +66,6 @@ void computeMomentumEnergyStdImpl(size_t startIndex, size_t endIndex, Dataset& d
     const auto* c33 = d.c33.data();
 
     auto* du      = d.du.data();
-    auto* du_visc = d.du_visc.data();
 
     auto* grad_P_x = d.ax.data();
     auto* grad_P_y = d.ay.data();
@@ -91,8 +90,6 @@ void computeMomentumEnergyStdImpl(size_t startIndex, size_t endIndex, Dataset& d
 
         T dt_i      = tsKCourant(maxvsignal, h[i], c[i], d.Kcour);
         minDt       = std::min(minDt, dt_i);
-        //T dt_visc_i = h[i] * h[i] / maxkv * 0.1;
-        //minDt       = std::min(minDt, dt_visc_i);
     }
 
     d.minDtCourant = minDt;
