@@ -14,10 +14,10 @@ void findNeighborsSph(const Tc* x, const Tc* y, const Tc* z, T* h, LocalIndex fi
 {
     LocalIndex numWork = lastId - firstId;
 
-    unsigned ngmin = ng0 / 4;
+    const unsigned ngmin = ng0 / 4;
 
     size_t        numFails     = 0;
-    constexpr int maxIteration = 10;
+    constexpr int maxIteration = 100000;
 
 #pragma omp parallel for reduction(+ : numFails)
     for (LocalIndex i = 0; i < numWork; ++i)
@@ -25,12 +25,26 @@ void findNeighborsSph(const Tc* x, const Tc* y, const Tc* z, T* h, LocalIndex fi
         LocalIndex id    = i + firstId;
         unsigned   ncSph = 1 + findNeighbors(id, x, y, z, h, treeView, box, ngmax, neighbors + i * ngmax);
 
+        T   h_upper{5.};
+        T   h_lower{0.};
         int iteration = 0;
         while ((ngmin > ncSph || (ncSph - 1) > ngmax) && iteration++ < maxIteration)
         {
-            h[id] = updateH(ng0, ncSph, h[id]);
+            h_upper = (ncSph - 1) > ngmax ? h[i] : h_upper;
+            h_lower = ngmin > ncSph ? h[i] : h_lower;
+            if (iteration < 10)
+            {
+                // Dampen updateH by weighting with proposed smoothing lengths of past iterations
+                h[id] = (updateH(ng0, ncSph, h[id]) + h[id] * iteration) / static_cast<T>(iteration + 1);
+            }
+            else
+            {
+                // Bisect algorithm
+                h[i] = (h_upper + h_lower) / 2.;
+            }
             ncSph = 1 + findNeighbors(id, x, y, z, h, treeView, box, ngmax, neighbors + i * ngmax);
         }
+
         numFails += (iteration >= maxIteration);
 
         nc[i] = ncSph;

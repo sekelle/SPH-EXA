@@ -27,7 +27,7 @@ void computeAccretionConditionImpl(size_t first, size_t last, const T1* x, const
         const double dz    = z[i] - spos[2];
         const double dist2 = dx * dx + dy * dy + dz * dz;
 
-        if (dist2 < star_size2) { remove[i] = 1; } // Accrete to star
+        if (dist2 < star_size2) { remove[i] = 1; } // Accrete on star
         else if (h[i] > removal_limit_h) { remove[i] = 2; }    // Remove from system
     }
 }

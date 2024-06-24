@@ -29,7 +29,7 @@ __global__ void computeAccretionConditionKernel(size_t first, size_t last, const
         const double dz    = z[i] - star_z;
         const double dist2 = dx * dx + dy * dy + dz * dz;
 
-        if (dist2 < star_size2) { remove[i] = 1; }
+        if (dist2 < star_size2) { remove[i] = 1; } //Accrete on star
         else if (h[i] > removal_limit_h) { remove[i] = 2; } // Remove from system
     }
 }
@@ -51,8 +51,8 @@ void computeAccretionConditionGPU(size_t first, size_t last, const T1* x, const 
                                                                spos[2], star_size * star_size, removal_limit_h);
     checkGpuErrors(cudaGetLastError());
     checkGpuErrors(cudaDeviceSynchronize());
-    size_t nrem = thrust::count_if(thrust::device, remove + first, remove + last, debug_zero{});
-    printf("computeAccretionConditionGPU remove : %u\n", nrem);
+    //size_t nrem = thrust::count_if(thrust::device, remove + first, remove + last, debug_zero{});
+    //printf("computeAccretionConditionGPU remove : %u\n", nrem);
 }
 
 template void computeAccretionConditionGPU(size_t, size_t, const double*, const double*, const double*, const float*,

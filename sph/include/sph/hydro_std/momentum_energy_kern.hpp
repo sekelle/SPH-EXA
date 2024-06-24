@@ -99,6 +99,8 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
         constexpr T av_alpha     = T(1);
         T           viscosity_ij = T(0.5) * artificial_viscosity(av_alpha, av_alpha, ci, cj, wij);
 
+        //***
+
         // T v_norm   = std::sqrt(vx_ij * vx_ij + vy_ij * vy_ij + vz_ij * vz_ij);
         // T kin_visc = av_alpha * ci * hi + 2. * hi * hi * v_norm / dist;
         // maxkvi     = (kin_visc > maxkvi) ? kin_visc : maxkvi;
@@ -106,6 +108,7 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
         // Full signal formula ***
         // T vijsignal = std::sqrt(ci * ci + 2. * wij * wij) + std::sqrt(cj * cj + 2. * wij * wij) - wij;
         //*****
+
         // For time-step calculations
         T vijsignal = ci + cj - T(3) * wij;
         maxvsignali = (vijsignal > maxvsignali) ? vijsignal : maxvsignali;
@@ -115,10 +118,8 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
 
         T mj_pro_i = mj * pri / (gradh_i * roi * roi);
 
-        T mj_roi = mj / roi;
         {
-            T a = Wi * (mj_pro_i + viscosity_ij * mi_roi);
-            // T a = Wi * (mj_pro_i + viscosity_ij * mj_roi);
+            T a = Wi * (mj_pro_i + viscosity_ij * mi_roi); // This should maybe be mj_roi instead of mi_roi
 
             T b = mj_roj_Wj * (p[j] / (roj * gradh_j) + viscosity_ij);
 
@@ -126,20 +127,11 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
             momentum_y += a * termA2_i + b * termA2_j;
             momentum_z += a * termA3_i + b * termA3_j;
         }
-        // DEBUG: Change sign of viscosity_ij to negative in energy part
         {
-            //            T a = Wi * (T(2) * mj_pro_i + viscosity_ij * mi_roi); // changed to -visc
-            //            // T a = Wi * (T(2) * mj_pro_i + viscosity_ij * mj_roi);
-            //
-            //            T b = viscosity_ij * mj_roj_Wj; // changed to -visc
-            //
-            //            energy += vx_ij * (a * termA1_i + b * termA1_j) + vy_ij * (a * termA2_i + b * termA2_j) +
-            //                      vz_ij * (a * termA3_i + b * termA3_j);
-
             T a = Wi * (T(2) * mj_pro_i);
             energy += vx_ij * a * termA1_i + vy_ij * a * termA2_i + vz_ij * a * termA3_i;
 
-            T a_visc = Wi * (viscosity_ij * mi_roi);
+            T a_visc = Wi * (viscosity_ij * mi_roi); // This should maybe be mj_roi instead of mi_roi
             T b_visc = viscosity_ij * mj_roj_Wj;
             viscous_energy += vx_ij * (a_visc * termA1_i + b_visc * termA1_j) +
                               vy_ij * (a_visc * termA2_i + b_visc * termA2_j) +
@@ -149,8 +141,8 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
 
     // with the choice of calculating coordinate (r) and velocity (v_ij) differences as i - j,
     // we add the negative sign only here at the end instead of to termA123_ij in each iteration
-    du[i]       = -K * Tm1(0.5) * energy + stl::max(0., -K * Tm1(0.5) * viscous_energy);
-  //  du_visc[i]  = stl::max(0., -K * Tm1(0.5) * viscous_energy);
+    du[i] = -K * Tm1(0.5) * energy + stl::max(0., -K * Tm1(0.5) * viscous_energy);
+    //  du_visc[i]  = stl::max(0., -K * Tm1(0.5) * viscous_energy);
     grad_P_x[i] = K * momentum_x;
     grad_P_y[i] = K * momentum_y;
     grad_P_z[i] = K * momentum_z;

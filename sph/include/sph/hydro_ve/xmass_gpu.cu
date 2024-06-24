@@ -66,8 +66,10 @@ __global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<T
 
     cstone::LocalIndex* neighborsWarp = nidx + ngmax * TravConfig::targetSize * warpIdxGrid;
 
-    double h_upper{5.};
-    double h_lower{0.};
+    T              h_upper{5.};
+    T              h_lower{0.};
+    const unsigned ngmin = ng0 - 5;
+
     while (true)
     {
         // first thread in warp grabs next target
@@ -86,14 +88,10 @@ __global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<T
         constexpr int ncMaxIteration = 100000;
         for (int ncIt = 0; ncIt <= ncMaxIteration; ++ncIt)
         {
-            if (ncIt == ncMaxIteration)
-            {
-                nc_h_convergenceFailure = true;
-            }
+            if (ncIt == ncMaxIteration) { nc_h_convergenceFailure = true; }
 
-            //bool notEnough = ncSph < ng0 - 10;
-            //bool tooMany   = (ncSph - 1) > ngmax;
-            bool notEnough = ncSph < ng0 - 5;
+            // bool tooMany   = (ncSph - 1) > ngmax;
+            bool notEnough = ncSph < ngmin;
             bool tooMany   = (ncSph - 1) > ng0 + 5;
             bool repeat    = (notEnough || tooMany) && i < bodyEnd;
 
@@ -102,11 +100,12 @@ __global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<T
             if (!cstone::ballotSync(repeat)) { break; }
             if (repeat && ncIt < 10)
             {
+                // Dampen updateH by weighting with proposed smoothing lengths of past iterations
                 h[i] = (updateH(ng0, ncSph, h[i]) + h[i] * ncIt) / static_cast<T>(ncIt + 1);
             }
             else if (repeat)
             {
-                //Bisection
+                // Bisection
                 h[i] = (h_upper + h_lower) / 2.;
             }
             ncSph =

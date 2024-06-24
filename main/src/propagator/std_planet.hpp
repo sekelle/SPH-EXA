@@ -166,10 +166,10 @@ public:
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
+        //Accretion uses the keys field to mark particles that have to be removed
         fill(get<"keys">(d), first, last, KeyType{0});
 
         planet::computeAccretionCondition(first, last, d, star);
-
         planet::computeNewOrder(first, last, d, star);
         planet::applyNewOrder<ConservedFields, DependentFields>(first, last, d, star);
 
@@ -177,11 +177,11 @@ public:
         planet::exchangeAndAccreteOnStar(star, d.minDt_m1, rank);
 
         domain.setEndIndex(last - star.n_accreted_local - star.n_removed_local);
+
         timer.step("accreteParticles");
 
         sync(domain, simData);
         timer.step("domain::sync");
-
 
         d.resize(domain.nParticlesWithHalos());
         domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
@@ -193,10 +193,12 @@ public:
         planet::betaCooling(d, first, last, star);
         timer.step("betaCooling");
 
+        const auto t_du = planet::duTimestepAndTempFloor(simData.hydro, first, last, star);
+
         planet::computeCentralForce(simData.hydro, first, last, star);
         timer.step("computeCentralForce");
 
-        computeTimestep(first, last, d);
+        computeTimestep(first, last, d, t_du);
 
         timer.step("Timestep");
 
@@ -212,8 +214,8 @@ public:
             printf("star position: %lf\t%lf\t%lf\n", star.position[0], star.position[1], star.position[2]);
             printf("star mass: %lf\n", star.m);
             printf("additional pot. erg.: %lf\n", star.potential);
+            printf("rank 0: accreted %zu, removed %zu\n", star.n_accreted_local, star.n_removed_local);
         }
-        printf("rank: %d, accreted %zu, removed %zu\n", rank, star.n_accreted_local, star.n_removed_local);
     }
 
     void saveFields(IFileWriter* writer, size_t first, size_t last, DataType& simData,

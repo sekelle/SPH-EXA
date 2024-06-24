@@ -28,8 +28,8 @@ void computeAccretionCondition(size_t first, size_t last, Dataset& d, const Star
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
         computeAccretionConditionGPU(first, last, rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z),
-                                     rawPtr(d.devData.h), rawPtr(d.devData.keys), star.position.data(),
-                                     star.inner_size, star.removal_limit_h);
+                                     rawPtr(d.devData.h), rawPtr(d.devData.keys), star.position.data(), star.inner_size,
+                                     star.removal_limit_h);
     }
     else
     {
@@ -49,7 +49,8 @@ void computeNewOrder(size_t first, size_t last, Dataset& d, StarData& star)
     else { computeNewOrderImpl(first, last, d.keys.data(), &star.n_accreted_local, &star.n_removed_local); }
 }
 
-//! @brief Apply the new particle ordering to all the conserved fields. Dependent fields are used as scratch buffer.
+//! @brief Apply the new particle ordering to all the conserved fields. Dependent fields are used as scratch buffer. The
+//! particles are ordered as follows: active particles, particles to be accreted, other particles to be removed
 template<typename ConservedFields, typename DependentFields, typename Dataset, typename StarData>
 void applyNewOrder(size_t first, size_t last, Dataset& d, StarData& star)
 {
@@ -80,7 +81,7 @@ void applyNewOrder(size_t first, size_t last, Dataset& d, StarData& star)
         sortVectors);
 }
 
-//! @brief Compute total angular momentum and mass of the removed particles. Dependent Fields are used as scratch
+//! @brief Compute total angular momentum and mass of the accreted particles. Dependent Fields are used as scratch
 //! buffers.
 template<typename DependentFields, typename Dataset, typename StarData>
 void sumAccretedMassAndMomentum(size_t first, size_t last, Dataset& d, StarData& star)

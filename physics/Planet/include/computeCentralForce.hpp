@@ -71,8 +71,6 @@ void computeCentralForce(Dataset& d, size_t startIndex, size_t endIndex, StarDat
                                 d.az.data(), d.m.data(), star.position.data(), star.m, star.force_local.data(),
                                 &star.potential_local, d.g);
     }
-    printf("fx: %g, fy: %g, fz: %g, pot: %g\n", star.force_local[0], star.force_local[1], star.force_local[2],
-           star.potential);
 }
 
 } // namespace planet
