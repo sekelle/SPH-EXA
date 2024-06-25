@@ -152,7 +152,7 @@ public:
         d.treeView = domain.octreeProperties();
     }
 
-    void computeForces(DomainType& domain, DataType& simData)
+    void computeForces(DomainType& domain, DataType& simData) override
     {
         timer.start();
         pmReader.start();

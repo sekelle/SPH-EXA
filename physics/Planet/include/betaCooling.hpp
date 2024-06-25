@@ -80,18 +80,18 @@ void duTimestepAndTempFloor(Dataset& d, size_t startIndex, size_t endIndex, Star
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        transferToHost(d, startIndex, endIndex, {"du", "u", "adjust"});
+        transferToHost(d, startIndex, endIndex, {"du", "u"});
 
         auto dt_u = duTimestepAndTempFloorImpl(startIndex, endIndex, d.du.data(), d.u.data(), d.du_m1.data(),
-                                             star.u_floor, star.K_u);
+                                               star.u_floor, star.K_u);
 
-        transferToDevice(d, startIndex, endIndex, {"du", "u", "adjust"});
+        transferToDevice(d, startIndex, endIndex, {"du", "u"});
         star.t_du = dt_u;
     }
     else
     {
-        auto dt_u = duTimestepAndTempFloorImpl(startIndex, endIndex, d.du.data(), d.u.data(), d.du_m1.data(), star.u_floor,
-                                          star.K_u);
+        auto dt_u = duTimestepAndTempFloorImpl(startIndex, endIndex, d.du.data(), d.u.data(), d.du_m1.data(),
+                                               star.u_floor, star.K_u);
         star.t_du = dt_u;
     }
 }
