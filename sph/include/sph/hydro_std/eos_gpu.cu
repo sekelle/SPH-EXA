@@ -52,7 +52,7 @@ __global__ void cudaEOS_HydroStdTemp(size_t firstParticle, size_t lastParticle, 
 }
 
 template<class Tt, class Trho, class Tp, class Tc>
-__global__ void cudaEOS_HydroStd(size_t firstParticle, size_t lastParticle, Trho mui, Tt gamma, const Tt* u,
+__global__ void cudaEOS_HydroStd_u(size_t firstParticle, size_t lastParticle, Trho mui, Tt gamma, const Tt* u,
                                  const Trho* m, Trho* rho, Tp* p, Tc* c)
 {
     unsigned i = firstParticle + blockDim.x * blockIdx.x + threadIdx.x;
