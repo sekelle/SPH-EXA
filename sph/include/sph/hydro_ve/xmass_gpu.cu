@@ -64,8 +64,6 @@ __global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, unsigned ngmin, con
 
     LocalIndex* neighborsWarp = nidx + ngmax * TravConfig::targetSize * warpIdxGrid;
 
-    T h_upper(box.maxExtent());
-    T h_lower{0.};
 
     while (true)
     {
@@ -82,7 +80,9 @@ __global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, unsigned ngmin, con
         unsigned ncSph =
             1 + traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool)[0];
 
-        constexpr int ncMaxIteration = 100000;
+        T h_upper(box.maxExtent());
+        T h_lower{0.};
+        constexpr int ncMaxIteration = 1000;
         for (int ncIt = 0; ncIt <= ncMaxIteration; ++ncIt)
         {
             if (ncIt == ncMaxIteration) { nc_h_convergenceFailure = true; }

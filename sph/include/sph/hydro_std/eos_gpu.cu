@@ -42,6 +42,16 @@ namespace cuda
 {
 
 template<class Tt, class Trho, class Tp, class Tc>
+__global__ void cudaEOS_HydroStdTemp(size_t firstParticle, size_t lastParticle, Trho mui, Tt gamma, const Tt* temp,
+                                     const Trho* m, Trho* rho, Tp* p, Tc* c)
+{
+    unsigned i = firstParticle + blockDim.x * blockIdx.x + threadIdx.x;
+    if (i >= lastParticle) return;
+
+    util::tie(p[i], c[i]) = idealGasEOSTemp(temp[i], rho[i], mui, gamma);
+}
+
+template<class Tt, class Trho, class Tp, class Tc>
 __global__ void cudaEOS_HydroStd(size_t firstParticle, size_t lastParticle, Trho mui, Tt gamma, const Tt* u,
                                  const Trho* m, Trho* rho, Tp* p, Tc* c)
 {
@@ -52,13 +62,17 @@ __global__ void cudaEOS_HydroStd(size_t firstParticle, size_t lastParticle, Trho
 }
 
 template<class Tt, class Trho, class Tp, class Tc>
-void computeEOS_HydroStd(size_t firstParticle, size_t lastParticle, Trho mui, Tt gamma, const Tt* u, const Trho* m,
-                         Trho* rho, Tp* p, Tc* c)
+void computeEOS_HydroStd(size_t firstParticle, size_t lastParticle, Trho mui, Tt gamma, const Tt* temp, const Tt* u,
+                         const Trho* m, Trho* rho, Tp* p, Tc* c)
 {
     if (firstParticle == lastParticle) { return; }
     unsigned numThreads = 256;
     unsigned numBlocks  = cstone::iceil(lastParticle - firstParticle, numThreads);
-    cudaEOS_HydroStd<<<numBlocks, numThreads>>>(firstParticle, lastParticle, mui, gamma, u, m, rho, p, c);
+    if (u == nullptr)
+    {
+        cudaEOS_HydroStdTemp<<<numBlocks, numThreads>>>(firstParticle, lastParticle, mui, gamma, u, m, rho, p, c);
+    }
+    else { cudaEOS_HydroStd_u<<<numBlocks, numThreads>>>(firstParticle, lastParticle, mui, gamma, u, m, rho, p, c); }
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
