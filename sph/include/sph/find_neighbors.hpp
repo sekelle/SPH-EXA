@@ -15,7 +15,7 @@ void findNeighborsSph(const Tc* x, const Tc* y, const Tc* z, T* h, LocalIndex fi
     LocalIndex numWork = lastId - firstId;
 
     size_t        numFails     = 0;
-    constexpr int maxIteration = 100000;
+    constexpr int maxIteration = 110;
 
 #pragma omp parallel for reduction(+ : numFails)
     for (LocalIndex i = 0; i < numWork; ++i)
