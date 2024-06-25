@@ -170,6 +170,7 @@ public:
 
         planet::duTimestepAndTempFloor(simData.hydro, first, last, star);
 
+        printf("last: %zu\t first: %zu\t rank: %d\n", last, first, Base::rank_);
         planet::computeCentralForce(simData.hydro, first, last, star);
         timer.step("computeCentralForce");
     }

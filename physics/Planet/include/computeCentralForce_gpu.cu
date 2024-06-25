@@ -102,7 +102,8 @@ void computeCentralForceGPU(size_t first, size_t last, const Tpos* x, const Tpos
     Ts* star_pot_block;
     cudaMalloc(&star_pot_block, sizeof(Ts) * numBlocks);
 
-    printf("numBlocks: %u\t numThreads:%u\n", numBlocks, numThreads);
+    printf("numParticles: %u\t last: %u\t first: %u\t numBlocks: %u\t numThreads:%u\n", numParticles, last, first,
+           numBlocks, numThreads);
     computeCentralForceGPUKernel<numThreads><<<numBlocks, numThreads>>>(
         first, last, x, y, z, ax, ay, az, m, star_pos[0], star_pos[1], star_pos[2], star_mass, g, star_force_block_x,
         star_force_block_y, star_force_block_z, star_pot_block);
