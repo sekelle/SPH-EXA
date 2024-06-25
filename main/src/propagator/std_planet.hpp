@@ -132,6 +132,7 @@ public:
         d.resize(domain.nParticlesWithHalos());
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
+        printf("last: %zu\t first: %zu\t rank: %d\n", last, first, Base::rank_);
 
         domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
 
