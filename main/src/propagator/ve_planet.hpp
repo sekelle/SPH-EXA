@@ -274,10 +274,11 @@ public:
     void saveFields(IFileWriter* writer, size_t first, size_t last, DataType& simData,
                     const cstone::Box<T>& box) override
     {
-        auto& d             = simData.hydro;
-        auto  fieldPointers = d.data();
-        auto  indicesDone   = d.outputFieldIndices;
-        auto  namesDone     = d.outputFieldNames;
+        auto& d = simData.hydro;
+        d.resize(d.accSize());
+        auto fieldPointers = d.data();
+        auto indicesDone   = d.outputFieldIndices;
+        auto namesDone     = d.outputFieldNames;
 
         auto output = [&]()
         {
@@ -300,8 +301,6 @@ public:
 
         // first output pass: write everything allocated at the end of the step
         output();
-
-        release(d, "ax", "ay", "az");
 
         // second output pass: write temporary quantities produced by the EOS
         release(d, "c11", "c12", "c13");
