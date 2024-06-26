@@ -37,12 +37,14 @@ void betaCoolingImpl(size_t first, size_t last, const Tpos* x, const Tpos* y, co
 
 template<std::floating_point Tt>
 Tt duTimestepAndTempFloorImpl(size_t first, size_t last, std::floating_point auto* du, std::floating_point auto* u,
-                              const std::floating_point auto* du_m1, std::floating_point auto u_floor, Tt k_u)
+                              const std::floating_point auto* du_m1, std::floating_point auto u_floor,
+                              std::floating_point auto u_max, Tt k_u)
 {
     size_t n_below_floor{};
+    size_t n_above_max{};
     Tt     duTimestepMin = std::numeric_limits<Tt>::infinity();
 
-#pragma omp parallel for reduction(min : duTimestepMin) reduction(+ : n_below_floor)
+#pragma omp parallel for reduction(min : duTimestepMin) reduction(+ : n_below_floor) reduction(+ : n_above_max)
     for (size_t i = first; i < last; i++)
     {
         if (u[i] < u_floor)
@@ -51,11 +53,17 @@ Tt duTimestepAndTempFloorImpl(size_t first, size_t last, std::floating_point aut
             du[i] = std::max(0., du[i]);
             n_below_floor++;
         }
+        else if (u[i] > u_max)
+        {
+            u[i]  = u_max;
+            du[i] = std::min(0., du[i]);
+            n_above_max++;
+        }
 
         Tt duTimestep = k_u * std::abs(u[i] / du[i]);
         duTimestepMin = std::min(duTimestepMin, duTimestep);
     }
-    printf("n_below_floor: %zu\n", n_below_floor);
+    printf("n_below_floor: %zu\t n_above_max: %zu\n", n_below_floor, n_above_max);
     return duTimestepMin;
 }
 
@@ -83,7 +91,7 @@ void duTimestepAndTempFloor(Dataset& d, size_t startIndex, size_t endIndex, Star
         transferToHost(d, startIndex, endIndex, {"du", "u"});
 
         auto dt_u = duTimestepAndTempFloorImpl(startIndex, endIndex, d.du.data(), d.u.data(), d.du_m1.data(),
-                                               star.u_floor, star.K_u);
+                                               star.u_floor, star.u_max, star.K_u);
 
         transferToDevice(d, startIndex, endIndex, {"du", "u"});
         star.t_du = dt_u;
@@ -91,7 +99,7 @@ void duTimestepAndTempFloor(Dataset& d, size_t startIndex, size_t endIndex, Star
     else
     {
         auto dt_u = duTimestepAndTempFloorImpl(startIndex, endIndex, d.du.data(), d.u.data(), d.du_m1.data(),
-                                               star.u_floor, star.K_u);
+                                               star.u_floor, star.u_max, star.K_u);
         star.t_du = dt_u;
     }
 }

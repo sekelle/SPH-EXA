@@ -74,7 +74,6 @@ protected:
     GroupData<Acc> groups_;
 
     StarData  star;
-    double    t_du{};
     /*! @brief the list of conserved particles fields with values preserved between iterations
      *
      * x, y, z, h and m are automatically considered conserved and must not be specified in this list

@@ -43,12 +43,10 @@ protected:
     using MHolder_t = typename cstone::AccelSwitchType<Acc, MultipoleHolderCpu, MultipoleHolderGpu>::template type<
         MultipoleType, DomainType, typename DataType::HydroData>;
 
-    MHolder_t mHolder_;
+    MHolder_t      mHolder_;
     GroupData<Acc> groups_;
 
     StarData star;
-    // std::array<double, 3> stellar_position;
-    // std::array<double, 3> stellar_position_m1;
 
     /*! @brief the list of conserved particles fields with values preserved between iterations
      *
@@ -59,7 +57,6 @@ protected:
     //! @brief the list of dependent particle fields, these may be used as scratch space during domain sync
     using DependentFields =
         FieldList<"rho", "p", "c", "ax", "ay", "az", "du", "c11", "c12", "c13", "c22", "c23", "c33", "nc">;
-    double t_du{};
 
 public:
     PlanetProp(std::ostream& output, size_t rank, const InitSettings& settings)
