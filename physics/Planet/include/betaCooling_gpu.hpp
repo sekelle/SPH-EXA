@@ -4,7 +4,7 @@
 
 #pragma once
 
-template<typename Tpos, typename Tu, typename Ts, typename Tdu, typename Trho>
+template<typename Tpos, typename Tu, typename Ts, typename Tdu, typename Trho, typename Trho2>
 void betaCoolingGPU(size_t first, size_t last, const Tpos* x, const Tpos* y, const Tpos* z, const Tu* u, Tdu* du,
                     Ts star_mass, const Ts* star_pos, Ts beta, Tpos g, const Trho* rho, Ts u_floor,
-                    Trho cooling_rho_limit);
+                    Trho2 cooling_rho_limit);

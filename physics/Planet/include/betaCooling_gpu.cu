@@ -11,10 +11,10 @@
 
 #include "cstone/sfc/box.hpp"
 
-template<typename Tpos, typename Tu, typename Ts, typename Tdu, typename Trho>
+template<typename Tpos, typename Tu, typename Ts, typename Tdu, typename Trho, typename Trho2>
 __global__ void betaCoolingGPUKernel(size_t first, size_t last, const Tpos* x, const Tpos* y, const Tpos* z, Tdu* du,
                                      const Tu* u, Ts star_mass, Ts star_pos_x, Ts star_pos_y, Ts star_pos_z, Ts beta,
-                                     Tpos g, const Trho* rho, Ts u_floor, Trho cooling_rho_limit)
+                                     Tpos g, const Trho* rho, Ts u_floor, Trho2 cooling_rho_limit)
 
 {
     cstone::LocalIndex i = first + blockDim.x * blockIdx.x + threadIdx.x;
@@ -30,10 +30,10 @@ __global__ void betaCoolingGPUKernel(size_t first, size_t last, const Tpos* x, c
     du[i] += -u[i] * omega / beta;
 }
 
-template<typename Tpos, typename Tu, typename Ts, typename Tdu, typename Trho>
+template<typename Tpos, typename Tu, typename Ts, typename Tdu, typename Trho, typename Trho2>
 void betaCoolingGPU(size_t first, size_t last, const Tpos* x, const Tpos* y, const Tpos* z, const Tu* u, Tdu* du,
                     Ts star_mass, const Ts* star_pos, Ts beta, Tpos g, const Trho* rho, Ts u_floor,
-                    Trho cooling_rho_limit)
+                    Trho2 cooling_rho_limit)
 {
     cstone::LocalIndex numParticles = last - first;
     unsigned           numThreads   = 256;
@@ -46,4 +46,4 @@ void betaCoolingGPU(size_t first, size_t last, const Tpos* x, const Tpos* y, con
 }
 
 template void betaCoolingGPU(size_t, size_t, const double*, const double*, const double* z, const double*, double*, double,
-                             const double*, double, double, const float*, double, float);
+                             const double*, double, double, const double*, double, float);

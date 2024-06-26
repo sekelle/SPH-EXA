@@ -12,11 +12,11 @@
 namespace planet
 {
 
-template<typename Tpos, typename Ts, typename Trho>
+template<typename Tpos, typename Ts>
 void betaCoolingImpl(size_t first, size_t last, const Tpos* x, const Tpos* y, const Tpos* z,
                      std::floating_point auto* du, const std::floating_point auto* u, Ts star_mass, const Ts* star_pos,
-                     Ts beta, Tpos g, const Trho* rho, std::floating_point auto u_floor,
-                     Trho cooling_rho_limit = 1.683e-3)
+                     Ts beta, Tpos g, const std::floating_point auto* rho, std::floating_point auto u_floor,
+                     std::floating_point auto cooling_rho_limit = 1.683e-3)
 {
 
 #pragma omp parallel for
