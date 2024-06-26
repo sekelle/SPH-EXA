@@ -100,7 +100,7 @@ __global__ void momentumEnergyGpu(Tc K, Tc Kcour, T Atmin, T Atmax, T ramp, unsi
             auto min_dt_group = cstone::warpMin(dt_lane);
             if ((threadIdx.x & (GpuConfig::warpSize - 1)) == 0)
             {
-                groupDt[targetIdx] = stl::min(groupDt[targetIdx], min_dt_group);
+                groupDt[targetIdx] = stl::min(groupDt[targetIdx], float(min_dt_group));
             }
         }
 
