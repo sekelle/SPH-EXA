@@ -57,6 +57,8 @@ void computeAccretionConditionGPU(size_t first, size_t last, const T1* x, const 
 
 template void computeAccretionConditionGPU(size_t, size_t, const double*, const double*, const double*, const float*,
                                            uint64_t*, const double*, double, double);
+template void computeAccretionConditionGPU(size_t, size_t, const double*, const double*, const double*, const double*,
+                                           uint64_t*, const double*, double, double);
 template<typename T>
 struct KeepParticle
 {
@@ -135,4 +137,6 @@ void sumMassAndMomentumGPU(size_t first, size_t last, const Tv* vx, const Tv* vy
 }
 
 template void sumMassAndMomentumGPU(size_t, size_t, const float*, const float*, const float*, const float*, float*,
+                                    double*, double*);
+template void sumMassAndMomentumGPU(size_t, size_t, const double*, const double*, const double*, const double*, double*,
                                     double*, double*);

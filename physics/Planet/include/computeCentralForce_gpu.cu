@@ -128,3 +128,5 @@ void computeCentralForceGPU(size_t first, size_t last, const Tpos* x, const Tpos
 
 template void computeCentralForceGPU(size_t, size_t, const double*, const double*, const double*, float*, float*,
                                      float*, const float*, const double*, double, double*, double*, double);
+template void computeCentralForceGPU(size_t, size_t, const double*, const double*, const double*, double*, double*,
+                                     double*, const double*, const double*, double, double*, double*, double);
