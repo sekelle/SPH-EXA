@@ -21,6 +21,8 @@ struct StarData
     double                K_u{0.25};
     double du_adjust{std::numeric_limits<double>::infinity()}; //  ~ 0.25 * u_typical / t_resolve; 0.25 * 5e-5
                                                                // / 0.125 = 1e-4
+    double Kpoly{1.9998578841e-3};
+    double exp_poly{5. / 3.};
 
     template<typename Archive>
     void loadOrStoreAttributes(Archive* ar)
@@ -57,6 +59,8 @@ struct StarData
         optionalIO("star::u_max", &u_max, 1);
         optionalIO("star::K_u", &K_u, 1);
         optionalIO("star::du_adjust", &du_adjust, 1);
+        optionalIO("star::Kpoly", &Kpoly, 1);
+        optionalIO("star::exp_poly", &exp_poly, 1);
     };
 
     //! @brief Potential from interaction between star and particles

@@ -51,7 +51,6 @@ HOST_DEVICE_FUN auto idealGasEOSTemp(T1 temp, T2 rho, T3 mui, T1 gamma)
     return util::tuple<Tc, Tc>{p, c};*/
 }
 
-
 /*! @brief Polytropic EOS for a 1.4 M_sun and 12.8 km neutron star
  *
  * @param rho  baryonic density
@@ -61,7 +60,7 @@ HOST_DEVICE_FUN auto idealGasEOSTemp(T1 temp, T2 rho, T3 mui, T1 gamma)
  * Returns pressure, and speed of sound
  */
 template<class T>
-HOST_DEVICE_FUN auto polytropicEOS(T rho)
+HOST_DEVICE_FUN auto polytropicEOS_neutronstar(T rho)
 {
     constexpr T Kpol     = 2.246341237993810232e-10;
     constexpr T gammapol = 3.e0;
@@ -80,7 +79,7 @@ HOST_DEVICE_FUN auto polytropicEOS(T rho)
  * @param d           the dataset with the particle buffers
  */
 template<typename Dataset>
-void computeEOS_Polytropic(size_t startIndex, size_t endIndex, Dataset& d)
+void computeEOS_Polytropic_neutronstar(size_t startIndex, size_t endIndex, Dataset& d)
 {
     const auto* kx = d.kx.data();
     const auto* xm = d.xm.data();
@@ -93,8 +92,23 @@ void computeEOS_Polytropic(size_t startIndex, size_t endIndex, Dataset& d)
     for (size_t i = startIndex; i < endIndex; ++i)
     {
         auto rho             = kx[i] * m[i] / xm[i];
-        std::tie(p[i], c[i]) = polytropicEOS(rho);
+        std::tie(p[i], c[i]) = polytropicEOS_neutronstar(rho);
     }
+}
+
+/*! @brief general polytropic equation of state
+ *
+ * @param rho SPH density
+ */
+template<typename T1, typename T2, typename T3, typename T4>
+HOST_DEVICE_FUN auto polytropicEOS(T1 Kpoly, T2 exp_poly, T3 gamma, T4 rho)
+{
+    using Tc = std::common_type_t<T1, T2, T3, T4>;
+
+    Tc p = Kpoly * std::pow(rho, exp_poly);
+    Tc c = std::sqrt(gamma * p / rho);
+
+    return util::tuple<Tc, Tc>{p, c};
 }
 
 } // namespace sph

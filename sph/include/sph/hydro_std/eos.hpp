@@ -79,15 +79,42 @@ void computeEOS_HydroStdImpl(size_t startIndex, size_t endIndex, Dataset& d)
     }
 }
 
+template<typename Dataset, typename StarData>
+void computePolytropic_HydroStdImpl(size_t startIndex, size_t endIndex, Dataset& d, const StarData& star)
+{
+    const auto* rho = d.rho.data();
+
+    auto* p = d.p.data();
+    auto* c = d.c.data();
+
+#pragma omp parallel for schedule(static)
+    for (size_t i = startIndex; i < endIndex; ++i)
+    {
+        std::tie(p[i], c[i]) = polytropicEOS(star.Kpoly, star.exp_poly, d.gamma, rho[i]);
+    }
+}
+
 template<class Dataset>
 void computeEOS_HydroStd(size_t startIndex, size_t endIndex, Dataset& d)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        cuda::computeEOS_HydroStd(startIndex, endIndex, d.muiConst, d.gamma, rawPtr(d.devData.temp), rawPtr(d.devData.u), rawPtr(d.devData.m),
-                                  rawPtr(d.devData.rho), rawPtr(d.devData.p), rawPtr(d.devData.c));
+        cuda::computeEOS_HydroStd(startIndex, endIndex, d.muiConst, d.gamma, rawPtr(d.devData.temp),
+                                  rawPtr(d.devData.u), rawPtr(d.devData.m), rawPtr(d.devData.rho), rawPtr(d.devData.p),
+                                  rawPtr(d.devData.c));
     }
     else { computeEOS_HydroStdImpl(startIndex, endIndex, d); }
+}
+
+template<class Dataset, typename StarData>
+void computePolytropicEOS_HydroStd(size_t startIndex, size_t endIndex, Dataset& d, const StarData& star)
+{
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    {
+        cuda::computePolytropicEOS_HydroStd(startIndex, endIndex, star.Kpoly, star.exp_poly, d.gamma,
+                                            rawPtr(d.devData.rho), rawPtr(d.devData.p), rawPtr(d.devData.c));
+    }
+    else { computePolytropic_HydroStdImpl(startIndex, endIndex, d, star); }
 }
 
 } // namespace sph

@@ -46,6 +46,9 @@
 #endif
 #include "turb_ve.hpp"
 #include "std_planet.hpp"
+#include "std_tde.hpp"
+#include "ve_tde.hpp"
+
 namespace sphexa
 {
 
@@ -86,6 +89,8 @@ propagatorFactory(const std::string& choice, bool avClean, std::ostream& output,
     {
         return std::make_unique<PlanetVEProp<false, DomainType, ParticleDataType>>(output, rank, s);
     }
+    if (choice == "std-tde") { return std::make_unique<TdeProp<DomainType, ParticleDataType>>(output, rank, s); }
+    if (choice == "ve-tde") { return std::make_unique<TdeVeProp<false, DomainType, ParticleDataType>>(output, rank, s); }
 
     throw std::runtime_error("Unknown propagator choice: " + choice);
 }
