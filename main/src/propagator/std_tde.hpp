@@ -174,7 +174,7 @@ public:
         size_t last  = domain.endIndex();
         auto&  d     = simData.hydro;
 
-        computeTimestep(first, last, d, star.t_du);
+        computeTimestep(first, last, d);
         timer.step("Timestep");
 
         computePositions(groups_.view(), d, domain.box(), d.minDt, {float(d.minDt_m1)});
