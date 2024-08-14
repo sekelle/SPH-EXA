@@ -29,13 +29,19 @@ static __device__ unsigned dev_n_accreted;
 
 using cstone::TravConfig;
 
-template<typename T1, typename Th, typename Tkeys, typename T2, typename Tm, typename Tv>
+template<typename T1, typename Th, typename Tremove, typename T2, typename Tm, typename Tv>
 __global__ void computeAccretionConditionKernel(size_t first, size_t last, const T1* x, const T1* y, const T1* z,
-                                                const Th* h, Tkeys* keys, const Tm* m, const Tv* vx, const Tv* vy,
+                                                const Th* h, Tremove* remove, const Tm* m, const Tv* vx, const Tv* vy,
                                                 const Tv* vz, T2 star_x, T2 star_y, T2 star_z, T2 star_size2,
                                                 T2 removal_limit_h)
 {
     cstone::LocalIndex i = first + blockDim.x * blockIdx.x + threadIdx.x;
+    double             accr_mass{};
+    double             accr_mom_x{};
+    double             accr_mom_y{};
+    double             accr_mom_z{};
+    unsigned           accreted{};
+    unsigned           removed{};
 
     if (i >= last) {}
     else
@@ -45,17 +51,10 @@ __global__ void computeAccretionConditionKernel(size_t first, size_t last, const
         const double dz    = z[i] - star_z;
         const double dist2 = dx * dx + dy * dy + dz * dz;
 
-        double   accr_mass{};
-        double   accr_mom_x{};
-        double   accr_mom_y{};
-        double   accr_mom_z{};
-        unsigned accreted{};
-        unsigned removed{};
-
         if (dist2 < star_size2)
         {
             // Accrete on star
-            keys[i]    = cstone::removeKey<Tkeys>::value;
+            remove[i]  = cstone::removeKey<Tremove>::value;
             accr_mass  = m[i];
             accr_mom_x = m[i] * vx[i];
             accr_mom_y = m[i] * vy[i];
@@ -65,59 +64,44 @@ __global__ void computeAccretionConditionKernel(size_t first, size_t last, const
         else if (h[i] > removal_limit_h)
         {
             // Remove from system
-            keys[i] = cstone::removeKey<Tkeys>::value;
-            removed = 1;
+            remove[i] = cstone::removeKey<Tremove>::value;
+            removed   = 1;
         }
+    }
+    typedef cub::BlockReduce<double, TravConfig::numThreads> BlockReduceDouble;
 
-        typedef cub::BlockReduce<double, TravConfig::numThreads> BlockReduceDouble;
-        __shared__ typename BlockReduceDouble::TempStorage       temp_accr_mass;
-        BlockReduceDouble                                        reduce_accr_mass(temp_accr_mass);
-        double block_accr_mass = reduce_accr_mass.Reduce(accr_mass, cub::Sum());
+    __shared__ typename BlockReduceDouble::TempStorage temp_accr_mass;
 
-        // typedef cub::BlockReduce<double, TravConfig::numThreads> BlockReduceTv;
-        __shared__ typename BlockReduceDouble::TempStorage temp_accr_mom_x;
-        __shared__ typename BlockReduceDouble::TempStorage temp_accr_mom_y;
-        __shared__ typename BlockReduceDouble::TempStorage temp_accr_mom_z;
-        BlockReduceDouble                                  reduce_accr_mom_x(temp_accr_mom_x);
-        BlockReduceDouble                                  reduce_accr_mom_y(temp_accr_mom_y);
-        BlockReduceDouble                                  reduce_accr_mom_z(temp_accr_mom_z);
+    double block_accr_mass = BlockReduceDouble(temp_accr_mass).Reduce(accr_mass, cub::Sum());
 
-        double block_accr_mom_x = reduce_accr_mom_x.Reduce(accr_mom_x, cub::Sum());
-        double block_accr_mom_y = reduce_accr_mom_y.Reduce(accr_mom_y, cub::Sum());
-        double block_accr_mom_z = reduce_accr_mom_z.Reduce(accr_mom_z, cub::Sum());
+    __shared__ typename BlockReduceDouble::TempStorage temp_accr_mom_x, temp_accr_mom_y, temp_accr_mom_z;
 
-        typedef cub::BlockReduce<unsigned, TravConfig::numThreads> BlockReduceUnsigned;
-        __shared__ typename BlockReduceUnsigned::TempStorage       temp_n_removed;
-        __shared__ typename BlockReduceUnsigned::TempStorage       temp_n_accreted;
+    double block_accr_mom_x = BlockReduceDouble(temp_accr_mom_x).Reduce(accr_mom_x, cub::Sum());
+    double block_accr_mom_y = BlockReduceDouble(temp_accr_mom_y).Reduce(accr_mom_y, cub::Sum());
+    double block_accr_mom_z = BlockReduceDouble(temp_accr_mom_z).Reduce(accr_mom_z, cub::Sum());
 
-        BlockReduceUnsigned reduce_n_removed(temp_n_removed);
-        BlockReduceUnsigned reduce_n_accreted(temp_n_accreted);
-        unsigned            block_n_removed  = reduce_n_removed.Reduce(removed, cub::Sum());
-        unsigned            block_n_accreted = reduce_n_accreted.Reduce(accreted, cub::Sum());
+    typedef cub::BlockReduce<unsigned, TravConfig::numThreads> BlockReduceUnsigned;
 
-        __syncthreads();
+    __shared__ typename BlockReduceUnsigned::TempStorage temp_storage_n_rem, temp_storage_n_accr;
 
-        if (threadIdx.x == 0)
-        {
-            atomicAdd(&dev_accr_mass, block_accr_mass);
-            atomicAdd(&dev_accr_mom_x, block_accr_mom_x);
-            atomicAdd(&dev_accr_mom_y, block_accr_mom_y);
-            atomicAdd(&dev_accr_mom_z, block_accr_mom_z);
-            atomicAdd(&dev_n_removed, block_n_removed);
-            atomicAdd(&dev_n_accreted, block_n_accreted);
-        }
+    unsigned block_n_removed  = BlockReduceUnsigned(temp_storage_n_rem).Reduce(removed, cub::Sum());
+    unsigned block_n_accreted = BlockReduceUnsigned(temp_storage_n_accr).Reduce(accreted, cub::Sum());
+
+    __syncthreads();
+
+    if (threadIdx.x == 0)
+    {
+        atomicAdd(&dev_accr_mass, block_accr_mass);
+        atomicAdd(&dev_accr_mom_x, block_accr_mom_x);
+        atomicAdd(&dev_accr_mom_y, block_accr_mom_y);
+        atomicAdd(&dev_accr_mom_z, block_accr_mom_z);
+        atomicAdd(&dev_n_removed, block_n_removed);
+        atomicAdd(&dev_n_accreted, block_n_accreted);
     }
 }
 
-struct debug_zero
-{
-    __device__ bool operator()(size_t x) const { return x == 1; }
-};
-
 template<typename Dataset, typename StarData>
 void computeAccretionConditionGPU(size_t first, size_t last, Dataset& d, StarData& star)
-// const T2* spos, T2 star_size, T2 removal_limit_h, T2& m_accr, T2& vx_accr,
-// T2& vy_accr, T2& vz_accr, T2Int& n_removed_local, T2Int& n_accreted_local)
 {
     cstone::LocalIndex numParticles = last - first;
     unsigned           numThreads   = 256;
@@ -136,10 +120,6 @@ void computeAccretionConditionGPU(size_t first, size_t last, Dataset& d, StarDat
         first, last, rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.h),
         rawPtr(d.devData.keys), rawPtr(d.devData.m), rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz),
         star.position[0], star.position[1], star.position[2], star.inner_size * star.inner_size, star.removal_limit_h);
-    /*computeAccretionConditionKernel<<<numBlocks, numThreads>>>(first, last, x, y, z, h, remove, m, vx, vy, vz,
-                                                               star.position[0], star.position[1], star.position[2],
-                                                               star.inner_size * star.inner_size,
-       star.removal_limit_h);*/
     checkGpuErrors(cudaGetLastError());
     checkGpuErrors(cudaDeviceSynchronize());
 
@@ -163,22 +143,15 @@ void computeAccretionConditionGPU(size_t first, size_t last, Dataset& d, StarDat
     star.p_accreted_local[2] = pz_accr_ret;
     star.n_removed_local     = n_removed;
     star.n_accreted_local    = n_accr;
-    // size_t nrem = thrust::count_if(thrust::device, remove + first, remove + last, debug_zero{});
-    // printf("computeAccretionConditionGPU remove : %u\n", nrem);
 }
 
-template void computeAccretionConditionGPU(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>&,
-                                           /*, const double*, const double*, const double*, const float*,
-                                           uint64_t*, const double*, const double*, const double*, const double*,*/
-                                           StarData&);
-// const double*, double, double, double&, double&, double&, double&, size_t&,
-//  size_t&);
+template void computeAccretionConditionGPU(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>&, StarData&);
 
-/*template void computeAccretionConditionGPU(size_t, size_t, const double*, const double*, const double*, const double*,
-                                           uint64_t*, const double*, const double*, const double*, const double*,
-                                           StarData&);*/
-// const double*, double, double, double&, double&, double&, double&, size_t&,
-// size_t&);
+struct debug_zero
+{
+    __device__ bool operator()(size_t x) const { return x == 1; }
+};
+
 template<typename T>
 struct KeepParticle
 {
