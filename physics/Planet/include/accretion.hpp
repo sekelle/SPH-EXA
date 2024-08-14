@@ -31,75 +31,7 @@ void computeAccretionCondition(size_t first, size_t last, Dataset& d, StarData& 
     }
     else
     {
-        computeAccretionConditionImpl(first, last, d.x.data(), d.y.data(), d.z.data(), d.h.data(), d.keys.data(),
-                                      star.position.data(), star.inner_size, star.removal_limit_h);
-    }
-}
-
-//! @brief Compute new particle ordering with the particles to remove at the end. Overwrites keys.
-template<typename Dataset, typename StarData>
-void computeNewOrder(size_t first, size_t last, Dataset& d, StarData& star)
-{
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
-    {
-        computeNewOrderGPU(first, last, rawPtr(get<"keys">(d)), &star.n_accreted_local, &star.n_removed_local);
-    }
-    else { computeNewOrderImpl(first, last, d.keys.data(), &star.n_accreted_local, &star.n_removed_local); }
-}
-
-//! @brief Apply the new particle ordering to all the conserved fields. Dependent fields are used as scratch buffer. The
-//! particles are ordered as follows: active particles, particles to be accreted, other particles to be removed
-template<typename ConservedFields, typename DependentFields, typename Dataset>
-void applyNewOrder(size_t first, size_t last, Dataset& d)
-{
-    using SortFields = decltype(util::FieldList<"x", "y", "z", "h", "m">{} + ConservedFields{});
-    auto sortVectors = get<SortFields>(d);
-
-    using ScratchFields       = FieldListExclude_t<"keys", DependentFields>;
-    auto scratch_fields_tuple = [&d]()
-    {
-        if constexpr (std::tuple_size_v<decltype(util::make_array(ScratchFields{}))> == 1)
-        {
-            return std::tie(get<ScratchFields>(d));
-        }
-        else { return get<ScratchFields>(d); }
-    };
-    auto scratchVectors = scratch_fields_tuple();
-
-    util::for_each_tuple(
-        [&](auto& vector)
-        {
-            auto& scratch = util::pickType<std::decay_t<decltype(vector)>&>(scratchVectors);
-            if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
-            {
-                applyNewOrderGPU(first, last, rawPtr(vector), rawPtr(scratch), rawPtr(get<"keys">(d)));
-            }
-            else { applyNewOrderImpl(first, last, vector.data(), scratch.data(), d.keys.data()); }
-        },
-        sortVectors);
-}
-
-//! @brief Compute total angular momentum and mass of the accreted particles. Dependent Fields are used as scratch
-//! buffers.
-template<typename DependentFields, typename Dataset, typename StarData>
-void sumAccretedMassAndMomentum(size_t first, size_t last, Dataset& d, StarData& star)
-{
-    if (star.n_accreted_local + star.n_removed_local > (last - first))
-        throw std::runtime_error("Accreting more particles than on rank");
-    auto  scratchBuffers = get<DependentFields>(d);
-    auto& scratch        = util::pickType<std::decay_t<decltype(get<"vx">(d))>&>(scratchBuffers);
-
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
-    {
-        sumMassAndMomentumGPU(last - star.n_accreted_local - star.n_removed_local, last - star.n_removed_local,
-                              rawPtr(get<"vx">(d)), rawPtr(get<"vy">(d)), rawPtr(get<"vz">(d)), rawPtr(get<"m">(d)),
-                              rawPtr(scratch), &star.m_accreted_local, star.p_accreted_local.data());
-    }
-    else
-    {
-        sumMassAndMomentumImpl(last - star.n_accreted_local - star.n_removed_local, last - star.n_removed_local,
-                               get<"vx">(d).data(), get<"vy">(d).data(), get<"vz">(d).data(), get<"m">(d).data(),
-                               scratch.data(), &star.m_accreted_local, star.p_accreted_local.data());
+        computeAccretionConditionImpl(first, last, d, star);
     }
 }
 
