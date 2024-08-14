@@ -29,9 +29,9 @@ static __device__ unsigned dev_n_accreted;
 
 using cstone::TravConfig;
 
-template<typename T1, typename Th, typename Tremove, typename T2, typename Tm, typename Tv>
+template<typename T1, typename Th, typename Tkeys, typename T2, typename Tm, typename Tv>
 __global__ void computeAccretionConditionKernel(size_t first, size_t last, const T1* x, const T1* y, const T1* z,
-                                                const Th* h, Tremove* remove, const Tm* m, const Tv* vx, const Tv* vy,
+                                                const Th* h, Tkeys* keys, const Tm* m, const Tv* vx, const Tv* vy,
                                                 const Tv* vz, T2 star_x, T2 star_y, T2 star_z, T2 star_size2,
                                                 T2 removal_limit_h)
 {
@@ -45,65 +45,66 @@ __global__ void computeAccretionConditionKernel(size_t first, size_t last, const
         const double dz    = z[i] - star_z;
         const double dist2 = dx * dx + dy * dy + dz * dz;
 
-        double   accreted_mass{};
-        double   accreted_momentum_x{};
-        double   accreted_momentum_y{};
-        double   accreted_momentum_z{};
+        double   accr_mass{};
+        double   accr_mom_x{};
+        double   accr_mom_y{};
+        double   accr_mom_z{};
         unsigned accreted{};
         unsigned removed{};
 
         if (dist2 < star_size2)
         {
-            remove[i]           = cstone::removeKey<Tremove>::value;
-            accreted_mass       = m[i];
-            accreted_momentum_x = m[i] * vx[i];
-            accreted_momentum_y = m[i] * vy[i];
-            accreted_momentum_z = m[i] * vz[i];
-            accreted            = 1;
-            /*remove[i] = 1;*/
-        } // Accrete on star
+            // Accrete on star
+            keys[i]    = cstone::removeKey<Tkeys>::value;
+            accr_mass  = m[i];
+            accr_mom_x = m[i] * vx[i];
+            accr_mom_y = m[i] * vy[i];
+            accr_mom_z = m[i] * vz[i];
+            accreted   = 1;
+        }
         else if (h[i] > removal_limit_h)
         {
-            remove[i] = cstone::removeKey<Tremove>::value; /*remove[i] = 2;*/
-            removed   = 1;
-        } // Remove from system
+            // Remove from system
+            keys[i] = cstone::removeKey<Tkeys>::value;
+            removed = 1;
+        }
 
-        typedef cub::BlockReduce<double, TravConfig::numThreads> BlockReduceTm;
-        __shared__ typename BlockReduceTm::TempStorage           temp_storage_m;
-        BlockReduceTm                                            reduce_tm(temp_storage_m);
-        double bs_accr_m = reduce_tm.Reduce(accreted_mass, cub::Sum());
+        typedef cub::BlockReduce<double, TravConfig::numThreads> BlockReduceDouble;
+        __shared__ typename BlockReduceDouble::TempStorage       temp_accr_mass;
+        BlockReduceDouble                                        reduce_accr_mass(temp_accr_mass);
+        double block_accr_mass = reduce_accr_mass.Reduce(accr_mass, cub::Sum());
 
-        typedef cub::BlockReduce<double, TravConfig::numThreads> BlockReduceTv;
-        __shared__ typename BlockReduceTv::TempStorage           temp_storage_px;
-        __shared__ typename BlockReduceTv::TempStorage           temp_storage_py;
-        __shared__ typename BlockReduceTv::TempStorage           temp_storage_pz;
-        BlockReduceTv                                            reduce_tvx(temp_storage_px);
-        BlockReduceTv                                            reduce_tvy(temp_storage_py);
-        BlockReduceTv                                            reduce_tvz(temp_storage_pz);
+        // typedef cub::BlockReduce<double, TravConfig::numThreads> BlockReduceTv;
+        __shared__ typename BlockReduceDouble::TempStorage temp_accr_mom_x;
+        __shared__ typename BlockReduceDouble::TempStorage temp_accr_mom_y;
+        __shared__ typename BlockReduceDouble::TempStorage temp_accr_mom_z;
+        BlockReduceDouble                                  reduce_accr_mom_x(temp_accr_mom_x);
+        BlockReduceDouble                                  reduce_accr_mom_y(temp_accr_mom_y);
+        BlockReduceDouble                                  reduce_accr_mom_z(temp_accr_mom_z);
 
-        double bs_accr_px = reduce_tvx.Reduce(accreted_momentum_x, cub::Sum());
-        double bs_accr_py = reduce_tvy.Reduce(accreted_momentum_y, cub::Sum());
-        double bs_accr_pz = reduce_tvz.Reduce(accreted_momentum_z, cub::Sum());
+        double block_accr_mom_x = reduce_accr_mom_x.Reduce(accr_mom_x, cub::Sum());
+        double block_accr_mom_y = reduce_accr_mom_y.Reduce(accr_mom_y, cub::Sum());
+        double block_accr_mom_z = reduce_accr_mom_z.Reduce(accr_mom_z, cub::Sum());
 
-        typedef cub::BlockReduce<size_t, TravConfig::numThreads> BlockReduceTint;
-        __shared__ typename BlockReduceTint::TempStorage         temp_storage_n_rem;
-        __shared__ typename BlockReduceTint::TempStorage         temp_storage_n_accr;
+        typedef cub::BlockReduce<unsigned, TravConfig::numThreads> BlockReduceUnsigned;
+        __shared__ typename BlockReduceUnsigned::TempStorage       temp_n_removed;
+        __shared__ typename BlockReduceUnsigned::TempStorage       temp_n_accreted;
 
-        BlockReduceTint reduce_n_rem(temp_storage_n_rem);
-        BlockReduceTint reduce_n_accr(temp_storage_n_accr);
-        unsigned        bs_n_rem  = reduce_n_rem.Reduce(removed, cub::Sum());
-        unsigned        bs_n_accr = reduce_n_accr.Reduce(accreted, cub::Sum());
+        BlockReduceUnsigned reduce_n_removed(temp_n_removed);
+        BlockReduceUnsigned reduce_n_accreted(temp_n_accreted);
+        unsigned            block_n_removed  = reduce_n_removed.Reduce(removed, cub::Sum());
+        unsigned            block_n_accreted = reduce_n_accreted.Reduce(accreted, cub::Sum());
 
         __syncthreads();
 
         if (threadIdx.x == 0)
         {
-            atomicAdd(&dev_accr_mass, bs_accr_m);
-            atomicAdd(&dev_accr_mom_x, bs_accr_px);
-            atomicAdd(&dev_accr_mom_y, bs_accr_py);
-            atomicAdd(&dev_accr_mom_z, bs_accr_pz);
-            atomicAdd(&dev_n_removed, bs_n_rem);
-            atomicAdd(&dev_n_accreted, bs_n_accr);
+            atomicAdd(&dev_accr_mass, block_accr_mass);
+            atomicAdd(&dev_accr_mom_x, block_accr_mom_x);
+            atomicAdd(&dev_accr_mom_y, block_accr_mom_y);
+            atomicAdd(&dev_accr_mom_z, block_accr_mom_z);
+            atomicAdd(&dev_n_removed, block_n_removed);
+            atomicAdd(&dev_n_accreted, block_n_accreted);
         }
     }
 }
