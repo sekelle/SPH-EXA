@@ -23,13 +23,21 @@ namespace planet
 
 //! @brief Flag particles for removal. Overwrites keys.
 template<typename Dataset, typename StarData>
-void computeAccretionCondition(size_t first, size_t last, Dataset& d, const StarData& star)
+void computeAccretionCondition(size_t first, size_t last, Dataset& d, StarData& star)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        computeAccretionConditionGPU(first, last, rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z),
-                                     rawPtr(d.devData.h), rawPtr(d.devData.keys), star.position.data(), star.inner_size,
-                                     star.removal_limit_h);
+        computeAccretionConditionGPU(first, last, d,
+                                     //rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z),
+                                     //rawPtr(d.devData.h), rawPtr(d.devData.keys), rawPtr(d.devData.m),
+                                     //rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz),
+                                     star);
+                                     /*star.position.data(), star.inner_size,
+                                     star.removal_limit_h, star.m_accreted_local, star.p_accreted_local[0],
+                                     star.p_accreted_local[1],
+                                     star.p_accreted_local[2], star.n_removed_local,
+                                     star.n_accreted_local);*/
+
     }
     else
     {
@@ -129,8 +137,13 @@ void exchangeAndAccreteOnStar(StarData& star, double minDt_m1, int rank)
         }
 
         star.m = m_star_new;
+
+        printf("accreted mass: %g\tstar mass: %g\n", m_accreted_global, star.m);
+        printf("accreted momentum x: %g\tstar momentum x: %g\n", p_accreted_global[0], p_star[0]);
+        printf("accreted momentum y: %g\tstar momentum y: %g\n", p_accreted_global[1], p_star[1]);
+        printf("accreted momentum z: %g\tstar momentum z: %g\n", p_accreted_global[2], p_star[2]);
     }
-    if (rank == 0) { printf("accreted mass: %g\tstar mass: %lf\n", m_accreted_global, star.m); }
+
     if (rank == 0) { printf("accreted mass local: %g\n", star.m_accreted_local); }
 
     MPI_Bcast(star.position_m1.data(), 3, MpiType<double>{}, 0, MPI_COMM_WORLD);
