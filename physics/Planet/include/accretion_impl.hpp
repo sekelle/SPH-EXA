@@ -22,7 +22,7 @@ void computeAccretionConditionImpl(size_t first, size_t last, Dataset& d, StarDa
     double accr_mass{};
     double accr_mom[3]{};
     size_t n_accreted{};
-    size_t n_removed;
+    size_t n_removed{};
 
 #pragma omp parallel for reduction(+ : accr_mass) reduction(+ : accr_mom[ : 3]) reduction(+ : n_accreted)              \
     reduction(+ : n_removed)
