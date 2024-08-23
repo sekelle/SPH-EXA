@@ -106,7 +106,19 @@ auto makeGlobalBox(const T* x, const T* y, const T* z, size_t numElements, const
         extrema[5] = -extrema[5];
     }
 
-    return Box<T>{extrema[0],
+    T globmin = std::min({extrema[0], extrema[2], extrema[4]});
+    T globmax = std::max({extrema[1], extrema[3], extrema[5]});
+    return Box<T>{globmin,
+                  globmax,
+                  globmin,
+                  globmax,
+                  globmin,
+                  globmax,
+                  previousBox.boundaryX(),
+                  previousBox.boundaryY(),
+                  previousBox.boundaryZ()};
+
+    /*return Box<T>{extrema[0],
                   extrema[1],
                   extrema[2],
                   extrema[3],
@@ -114,7 +126,7 @@ auto makeGlobalBox(const T* x, const T* y, const T* z, size_t numElements, const
                   extrema[5],
                   previousBox.boundaryX(),
                   previousBox.boundaryY(),
-                  previousBox.boundaryZ()};
+                  previousBox.boundaryZ()};*/
 }
 
 } // namespace cstone
