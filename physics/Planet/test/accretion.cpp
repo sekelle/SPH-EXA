@@ -167,7 +167,7 @@ struct AccretionTest : public ::testing::Test
     }
 };
 
-/*TEST_F(AccretionTest, testAccretion)
+TEST_F(AccretionTest, testAccretion)
 {
     // if (numRanks != 2) throw std::runtime_error("Must be excuted with two ranks");
 
@@ -190,7 +190,7 @@ struct AccretionTest : public ::testing::Test
 
     EXPECT_TRUE(n_inside == 0);
     EXPECT_TRUE(n_inside_with_halos == 0);
-}*/
+}
 
 TEST_F(AccretionTest, testAccretion2)
 {
@@ -198,7 +198,7 @@ TEST_F(AccretionTest, testAccretion2)
 
     sync();
 
-    /* const size_t first = domain_ptr->startIndex();
+     /*const size_t first = domain_ptr->startIndex();
      const size_t last  = domain_ptr->endIndex();
 
 
@@ -221,17 +221,17 @@ TEST_F(AccretionTest, testAccretion2)
             data.keys[i] = cstone::removeKey<KeyType>::value; }
     }*/
 
-    data.keys[1831] = cstone::removeKey<KeyType>::value;
-    data.keys[3609] = cstone::removeKey<KeyType>::value;
-    data.keys[7331] = cstone::removeKey<KeyType>::value;
-
-    data.keys[2168] = cstone::removeKey<KeyType>::value;
-    data.keys[4390] = cstone::removeKey<KeyType>::value;
-    data.keys[5826] = cstone::removeKey<KeyType>::value;
-    data.keys[5830] = cstone::removeKey<KeyType>::value;
-    data.keys[5831] = cstone::removeKey<KeyType>::value;
-    data.keys[5832] = cstone::removeKey<KeyType>::value;
-    data.keys[6168] = cstone::removeKey<KeyType>::value;
+    //data.keys[1831] = cstone::removeKey<KeyType>::value;
+    //data.keys[3609] = cstone::removeKey<KeyType>::value;
+    //data.keys[7331] = cstone::removeKey<KeyType>::value;
+//
+    //data.keys[2168] = cstone::removeKey<KeyType>::value;
+    //data.keys[4390] = cstone::removeKey<KeyType>::value;
+    //data.keys[5826] = cstone::removeKey<KeyType>::value;
+    //data.keys[5830] = cstone::removeKey<KeyType>::value;
+    //data.keys[5831] = cstone::removeKey<KeyType>::value;
+    //data.keys[5832] = cstone::removeKey<KeyType>::value;
+    //data.keys[6168] = cstone::removeKey<KeyType>::value;
 
     sync();
     printf("count: %zu\n", data.keys.size());

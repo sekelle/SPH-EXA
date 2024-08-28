@@ -129,7 +129,7 @@ public:
         d.resize(domain.nParticlesWithHalos());
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
-        printf("last: %zu\t first: %zu\t rank: %d\n", last, first, Base::rank_);
+        //printf("last: %zu\t first: %zu\t rank: %d\n", last, first, Base::rank_);
 
         domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
 
@@ -168,7 +168,7 @@ public:
 
         planet::duTimestepAndTempFloor(simData.hydro, first, last, star);
 
-        printf("last: %zu\t first: %zu\t rank: %d\n", last, first, Base::rank_);
+        //printf("last: %zu\t first: %zu\t rank: %d\n", last, first, Base::rank_);
         planet::computeCentralForce(simData.hydro, first, last, star);
         timer.step("computeCentralForce");
     }
@@ -200,7 +200,6 @@ public:
             printf("star position: %lf\t%lf\t%lf\n", star.position[0], star.position[1], star.position[2]);
             printf("star mass: %lf\n", star.m);
             printf("additional pot. erg.: %lf\n", star.potential);
-            printf("rank 0: accreted %zu, removed %zu\n", star.n_accreted_local, star.n_removed_local);
         }
     }
 
