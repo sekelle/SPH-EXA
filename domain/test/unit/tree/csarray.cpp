@@ -69,7 +69,6 @@ TEST(CornerstoneOctree, searchBounds11) { testBounds(9, 21, {8, 9}); }
 TEST(CornerstoneOctree, searchBounds12) { testBounds(12, 16, {0, 12}); }
 TEST(CornerstoneOctree, searchBounds13) { testBounds(8, nodeRange<uint64_t>(0), {10, 13}); }
 
-
 //! @brief test that computeNodeCounts correctly counts the number of codes for each node
 template<class CodeType>
 static void checkCountTreeNodes()
