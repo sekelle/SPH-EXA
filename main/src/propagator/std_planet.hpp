@@ -129,7 +129,7 @@ public:
         d.resize(domain.nParticlesWithHalos());
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
-        printf("last: %zu\t first: %zu\t rank: %d\n", last, first, Base::rank_);
+        //printf("last: %zu\t first: %zu\t rank: %d\n", last, first, Base::rank_);
 
         domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
 
@@ -168,7 +168,7 @@ public:
 
         planet::duTimestepAndTempFloor(simData.hydro, first, last, star);
 
-        printf("last: %zu\t first: %zu\t rank: %d\n", last, first, Base::rank_);
+        //printf("last: %zu\t first: %zu\t rank: %d\n", last, first, Base::rank_);
         planet::computeCentralForce(simData.hydro, first, last, star);
         timer.step("computeCentralForce");
     }
@@ -189,26 +189,17 @@ public:
         planet::computeAndExchangeStarPosition(star, d.minDt, d.minDt_m1, Base::rank_);
         timer.step("computeAndExchangeStarPosition");
 
-        // Accretion uses the keys field to mark particles that have to be removed
-        fill(get<"keys">(d), first, last, KeyType{0});
-
         planet::computeAccretionCondition(first, last, d, star);
-        planet::computeNewOrder(first, last, d, star);
-        planet::applyNewOrder<ConservedFields, DependentFields>(first, last, d);
+        timer.step("computeAccretionCondition");
 
-        planet::sumAccretedMassAndMomentum<DependentFields>(first, last, d, star);
         planet::exchangeAndAccreteOnStar(star, d.minDt_m1, Base::rank_);
-
-        domain.setEndIndex(last - star.n_accreted_local - star.n_removed_local);
-
-        timer.step("accreteParticles");
+        timer.step("exchangeAndAccreteOnStar");
 
         if (Base::rank_ == 0)
         {
             printf("star position: %lf\t%lf\t%lf\n", star.position[0], star.position[1], star.position[2]);
             printf("star mass: %lf\n", star.m);
             printf("additional pot. erg.: %lf\n", star.potential);
-            printf("rank 0: accreted %zu, removed %zu\n", star.n_accreted_local, star.n_removed_local);
         }
     }
 

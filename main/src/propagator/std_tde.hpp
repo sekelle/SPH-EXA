@@ -186,12 +186,10 @@ public:
         fill(get<"keys">(d), first, last, KeyType{0});
 
         planet::computeAccretionCondition(first, last, d, star);
-        planet::computeNewOrder(first, last, d, star);
-        planet::applyNewOrder<ConservedFields, DependentFields>(first, last, d);
+        timer.step("computeAccretionCondition");
 
         planet::exchangeAndAccreteOnStar(star, d.minDt_m1, Base::rank_);
-
-        domain.setEndIndex(last - star.n_accreted_local - star.n_removed_local);
+        timer.step("exchangeAndAccreteOnStar");
 
         timer.step("accreteParticles");
 
@@ -200,7 +198,6 @@ public:
             printf("star position: %lf\t%lf\t%lf\n", star.position[0], star.position[1], star.position[2]);
             printf("star mass: %lf\n", star.m);
             printf("additional pot. erg.: %lf\n", star.potential);
-            printf("rank 0: accreted %zu, removed %zu\n", star.n_accreted_local, star.n_removed_local);
         }
     }
 
