@@ -318,7 +318,7 @@ public:
             }
         } while (fail);
 
-        // diagnostics(keyView.size(), peers);
+        diagnostics(keyView.size(), peers);
 
         updateLayout(sorter, exchangeStart, keyView, particleKeys, std::tie(x, y, z, h, m), particleProperties,
                      scratch);
@@ -622,7 +622,7 @@ private:
                 {
                     KeyType fnstart  = focusTree[fi];
                     KeyType fnend    = focusTree[fi + 1];
-                    TreeNodeIndex gi = findNodeAbove(globalTree, fnstart);
+                    TreeNodeIndex gi = findNodeAbove(globalTree.data(), nNodes(globalTree), fnstart);
                     if (!(gi < nNodes(globalTree) && globalTree[gi] == fnstart && globalTree[gi + 1] <= fnend))
                     {
                         numFocusTruePeer++;
@@ -640,14 +640,17 @@ private:
                           << " focus h/true/peers/loc/tot: " << numFlags << "/" << numFocusTruePeer << "/"
                           << numFocusPeers << "/" << focusAssignment[myRank_].count() << "/"
                           << halos_.haloFlags().size() << " peers: [" << peers.size() << "] ";
-                if (numRanks_ <= 32)
+                if (numRanks_ <= 128)
                 {
                     for (auto r : peers)
                     {
                         std::cout << r << " ";
                     }
                 }
-                std::cout << std::endl;
+                KeyType k1 = global_.assignment()[i];
+                KeyType k2 = global_.assignment()[i + 1];
+
+                std::cout << "assignment " << i << ": " << std::oct << k1 << " - " << k2 << std::dec << std::endl;
             }
             MPI_Barrier(MPI_COMM_WORLD);
         }
