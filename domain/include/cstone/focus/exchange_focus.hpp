@@ -75,7 +75,7 @@ void countRequestParticles(gsl::span<const KeyType> leaves,
                            gsl::span<const TreeNodeIndex> levelRange,
                            gsl::span<unsigned> requestCounts)
 {
-#pragma omp parallel for
+//#pragma omp parallel for
     for (size_t i = 0; i < nNodes(requestLeaves); ++i)
     {
         KeyType startKey = requestLeaves[i];
@@ -85,6 +85,14 @@ void countRequestParticles(gsl::span<const KeyType> leaves,
         size_t endIdx   = findNodeAbove(leaves.data(), leaves.size(), endKey);
 
         TreeNodeIndex internalIdx = locateNode(startKey, endKey, prefixes.data(), levelRange.data());
+
+        assert(endIdx < leaves.size());
+        if (endKey != leaves[endIdx])
+        {
+            std::cout << "Let leaf " << std::oct << startKey << " " << endKey << " found " << leaves[startIdx] << " " << leaves[endIdx]
+                << std::dec << std::endl;
+            std::cout << startIdx << " " << endIdx << std::endl;
+        }
 
         // Nodes in @p leaves must match the request keys exactly, otherwise counts are wrong.
         // If this assertion fails, it means that the local leaves/counts does not have the required
