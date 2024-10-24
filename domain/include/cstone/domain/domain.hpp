@@ -267,12 +267,15 @@ public:
         float invThetaEff      = invThetaVecMac(theta_);
         std::vector<int> peers = findPeersMac(myRank_, global_.assignment(), global_.octree(), box(), invThetaEff);
 
+        diagnosticsA(peers);
+
         if (firstCall_)
         {
             // first rough convergence to avoid computing expansion centers of large nodes with a lot of particles
             focusTree_.converge(box(), keyView, peers, global_.assignment(), global_.treeLeaves(), global_.nodeCounts(),
                                 1.0, std::get<0>(scratch));
             focusTree_.updateMinMac(box(), global_.assignment(), 1.0);
+            if (myRank_ == 0) std::cout << "init converged min" << std::endl;
             int converged = 0, reps = 0;
             while (converged != numRanks_ || reps < 2)
             {
@@ -283,7 +286,9 @@ public:
                 focusTree_.updateMacs(box(), global_.assignment(), 1.0 / theta_);
                 MPI_Allreduce(MPI_IN_PLACE, &converged, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
                 reps++;
+                if (myRank_ == 0) std::cout << "init conv rep S" << std::endl;
             }
+            if (myRank_ == 0) std::cout << "init converged S" << std::endl;
         }
 
         int fail = 0;
@@ -640,6 +645,17 @@ private:
                           << " focus h/true/peers/loc/tot: " << numFlags << "/" << numFocusTruePeer << "/"
                           << numFocusPeers << "/" << focusAssignment[myRank_].count() << "/"
                           << halos_.haloFlags().size() << " peers: [" << peers.size() << "] ";
+            }
+            MPI_Barrier(MPI_COMM_WORLD);
+        }
+    }
+
+    void diagnosticsA(gsl::span<int> peers)
+    {
+        for (int i = 0; i < numRanks_; ++i)
+        {
+            if (i == myRank_)
+            {
                 if (numRanks_ <= 128)
                 {
                     for (auto r : peers)
@@ -650,6 +666,7 @@ private:
                 KeyType k1 = global_.assignment()[i];
                 KeyType k2 = global_.assignment()[i + 1];
 
+                std::cout << std::endl;
                 std::cout << "assignment " << i << ": " << std::oct << k1 << " - " << k2 << std::dec << std::endl;
             }
             MPI_Barrier(MPI_COMM_WORLD);
