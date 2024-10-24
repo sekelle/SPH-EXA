@@ -81,15 +81,29 @@ std::vector<int> findPeersMac(int myRank,
         IBox bBox             = sfcIBox(sfcKey(tree.codeStart(b)), tree.level(b));
         auto [aCenter, aSize] = centerAndSize<KeyType>(aBox, box);
         auto [bCenter, bSize] = centerAndSize<KeyType>(bBox, box);
-        return !minVecMacMutual(aCenter, aSize, bCenter, bSize, box, invThetaEff);
+        //return !minVecMacMutual(aCenter, aSize, bCenter, bSize, box, invThetaEff);
+        bool isClose = !minVecMacMutual(aCenter, aSize, bCenter, bSize, box, invThetaEff);
+
+        //if (tree.codeStart(b) == 0431325000000000000000lu && domainStart == 053263000000000000000lu)
+        //{
+        //    std::cout << " looking at " << std::oct << tree.codeStart(b) << " " << tree.codeEnd(b) << "(" << b << ") from "
+        //              << tree.codeStart(a) << " - " << tree.codeEnd(a) << ", isClose " << isClose << std::dec << std::endl;
+        //}
+        return isClose;
     };
 
     auto m2l = [](TreeNodeIndex, TreeNodeIndex) {};
 
     std::vector<int> peerRanks(assignment.numRanks(), 0);
-    auto p2p = [&domainTree, &assignment, &peerRanks](TreeNodeIndex /*a*/, TreeNodeIndex b)
+    auto p2p = [&domainTree, &assignment, &peerRanks, &tree = domainTree, myRank](TreeNodeIndex /*a*/, TreeNodeIndex b)
     {
         int peerRank = assignment.findRank(domainTree.codeStart(b));
+
+        if (tree.codeStart(b) == 0431325000000000000000lu && assignment[3] == 053263000000000000000lu && myRank == 3)
+        {
+            std::cout << " flagging " << peerRank << std::endl;
+        }
+
         if (peerRanks[peerRank] == 0) { peerRanks[peerRank] = 1; }
     };
 
@@ -111,7 +125,9 @@ std::vector<int> findPeersMac(int myRank,
     for (int i = 0; i < int(peerRanks.size()); ++i)
     {
         if (peerRanks[i]) { ret.push_back(i); }
+        //if (i != myRank) { ret.push_back(i); }
     }
+    if (myRank == 3) std::cout << std::endl;
 
     return ret;
 }
