@@ -367,7 +367,7 @@ public:
             exclusiveScanGpu(rawPtr(leafCountsAcc_) + firstIdx, rawPtr(leafCountsAcc_) + lastIdx + 1,
                              d_layout + firstIdx);
             computeLeafSourceCenterGpu(x, y, z, m, octree.leafToInternal + octree.numInternalNodes, octree.numLeafNodes,
-                                       d_layout, rawPtr(centersAcc_));
+                                       d_layout, octree.prefixes, box, rawPtr(centersAcc_));
             //! upsweep with local data in place
             upsweepCentersGpu(maxTreeLevel<KeyType>{}, treeData_.levelRange.data(), octree.childOffsets,
                               rawPtr(centersAcc_));

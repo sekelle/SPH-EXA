@@ -354,6 +354,22 @@ TEST(BoxOverlap, minPointDistance)
         T probe = std::sqrt(norm2(minDistance(X, center, size, box)));
         EXPECT_NEAR(std::sqrt(3) / mc, probe, 1e-10);
     }
+    {
+        Box<T> box(0, 1);
+        IBox ibox(0, mc / 2);
+
+        T px = (mc / 2.0 - 1) / mc;
+        Vec3<T> X{px, px, px};
+
+        auto [center, size] = centerAndSize<KeyType>(ibox, box);
+
+        EXPECT_NEAR(size[0], 0.25, 1e-10);
+        EXPECT_NEAR(size[1], 0.25, 1e-10);
+        EXPECT_NEAR(size[2], 0.25, 1e-10);
+
+        T probe = std::sqrt(norm2(minDistance(X, center, size, box)));
+        EXPECT_NEAR(0.0, probe, 1e-10);
+    }
 }
 
 TEST(BoxOverlap, minDistance)

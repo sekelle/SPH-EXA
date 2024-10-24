@@ -35,7 +35,7 @@
 namespace cstone
 {
 
-template<class Tc, class Tm, class Tf>
+template<class Tc, class Tm, class Tf, class KeyType>
 __global__ void computeLeafSourceCenterKernel(const Tc* x,
                                               const Tc* y,
                                               const Tc* z,
@@ -43,6 +43,8 @@ __global__ void computeLeafSourceCenterKernel(const Tc* x,
                                               const TreeNodeIndex* leafToInternal,
                                               TreeNodeIndex numLeaves,
                                               const LocalIndex* layout,
+                                              const KeyType* nodeKeys,
+                                              const Box<Tc> box,
                                               Vec4<Tf>* centers)
 {
     TreeNodeIndex leafIdx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -50,9 +52,37 @@ __global__ void computeLeafSourceCenterKernel(const Tc* x,
 
     TreeNodeIndex nodeIdx = leafToInternal[leafIdx];
     centers[nodeIdx]      = massCenter<Tf>(x, y, z, m, layout[leafIdx], layout[leafIdx + 1]);
+
+    KeyType nodeKey  = decodePlaceholderBit(nodeKeys[nodeIdx]);
+    int prefixLength = decodePrefixLength(nodeKeys[nodeIdx]);
+
+    IBox cellBox              = sfcIBox(sfcKey(nodeKey), prefixLength / 3);
+    auto [geoCenter, geoSize] = centerAndSize<KeyType>(cellBox, box);
+
+    if (layout[leafIdx] == layout[leafIdx + 1])
+    {
+        centers[nodeIdx] = {geoCenter[0], geoCenter[1], geoCenter[2], Tf(0)};
+    }
+
+    Vec3<Tc> dX = makeVec3(centers[nodeIdx]) - geoCenter;
+    float diagonal = sqrt(norm2(geoSize));
+    assert(diagonal >= sqrt(norm2(dX)));
+
+    //if (diagonal < sqrt(norm2(dX)))
+    //{
+    //    printf("box %d, [%d - %d], diag %f, norm(dX) %f, %f %f %f\n", nodeIdx, layout[leafIdx], layout[leafIdx + 1],
+    //           diagonal, sqrt(norm2(dX)), geoCenter[0], geoCenter[1], geoCenter[2]);
+    //    for (LocalIndex i = layout[leafIdx]; i < layout[leafIdx + 1]; ++i)
+    //    {
+    //        Vec3<Tc> part{x[i], y[i], z[i]};
+    //        auto d = minDistance(part, geoCenter, geoSize, box);
+    //        printf("  %d %f %f %f\n", nodeIdx, x[i], y[i], y[i]);
+    //        assert(sqrt(norm2(d)) < 1e-10);
+    //    }
+    //}
 }
 
-template<class Tc, class Tm, class Tf>
+template<class Tc, class Tm, class Tf, class KeyType>
 void computeLeafSourceCenterGpu(const Tc* x,
                                 const Tc* y,
                                 const Tc* z,
@@ -60,21 +90,28 @@ void computeLeafSourceCenterGpu(const Tc* x,
                                 const TreeNodeIndex* leafToInternal,
                                 TreeNodeIndex numLeaves,
                                 const LocalIndex* layout,
+                                const KeyType* nodeKeys,
+                                const Box<Tc>& box,
                                 Vec4<Tf>* centers)
 {
     unsigned numThreads = 256;
     unsigned numBlocks  = iceil(numLeaves, numThreads);
 
-    computeLeafSourceCenterKernel<<<numBlocks, numThreads>>>(x, y, z, m, leafToInternal, numLeaves, layout, centers);
+    computeLeafSourceCenterKernel<<<numBlocks, numThreads>>>(x, y, z, m, leafToInternal, numLeaves, layout, nodeKeys,
+                                                             box, centers);
 }
 
-#define COMPUTE_LEAF_SOURCE_CENTER_GPU(Tc, Tm, Tf)                                                                     \
+#define COMPUTE_LEAF_SOURCE_CENTER_GPU(Tc, Tm, Tf, KeyType)                                                            \
     template void computeLeafSourceCenterGpu(const Tc*, const Tc*, const Tc*, const Tm*, const TreeNodeIndex*,         \
-                                             TreeNodeIndex, const LocalIndex*, Vec4<Tf>*);
+                                             TreeNodeIndex, const LocalIndex*, const KeyType*, const Box<Tc>&,         \
+                                             Vec4<Tf>*);
 
-COMPUTE_LEAF_SOURCE_CENTER_GPU(double, double, double);
-COMPUTE_LEAF_SOURCE_CENTER_GPU(double, float, double);
-COMPUTE_LEAF_SOURCE_CENTER_GPU(float, float, float);
+COMPUTE_LEAF_SOURCE_CENTER_GPU(double, double, double, uint32_t);
+COMPUTE_LEAF_SOURCE_CENTER_GPU(double, float, double, uint32_t);
+COMPUTE_LEAF_SOURCE_CENTER_GPU(float, float, float, uint32_t);
+COMPUTE_LEAF_SOURCE_CENTER_GPU(double, double, double, uint64_t);
+COMPUTE_LEAF_SOURCE_CENTER_GPU(double, float, double, uint64_t);
+COMPUTE_LEAF_SOURCE_CENTER_GPU(float, float, float, uint64_t);
 
 template<class T>
 __global__ void upsweepCentersKernel(TreeNodeIndex firstCell,

@@ -275,7 +275,6 @@ public:
             focusTree_.converge(box(), keyView, peers, global_.assignment(), global_.treeLeaves(), global_.nodeCounts(),
                                 1.0, std::get<0>(scratch));
             focusTree_.updateMinMac(box(), global_.assignment(), 1.0);
-            if (myRank_ == 0) std::cout << "init converged min" << std::endl;
             int converged = 0, reps = 0;
             while (converged != numRanks_ || reps < 2)
             {
@@ -286,9 +285,7 @@ public:
                 focusTree_.updateMacs(box(), global_.assignment(), 1.0 / theta_);
                 MPI_Allreduce(MPI_IN_PLACE, &converged, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
                 reps++;
-                if (myRank_ == 0) std::cout << "init conv rep S" << std::endl;
             }
-            if (myRank_ == 0) std::cout << "init converged S" << std::endl;
         }
 
         int fail = 0;

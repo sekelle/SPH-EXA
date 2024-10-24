@@ -46,7 +46,7 @@ namespace cstone
  * @param[in]  layout           particle location of each node, length @a numLeaves + 1
  * @param[out] centers          output mass centers, in internal node layout, length >= max(leafToInternal)
  */
-template<class Tc, class Tm, class Tf>
+template<class Tc, class Tm, class Tf, class KeyType>
 extern void computeLeafSourceCenterGpu(const Tc* x,
                                        const Tc* y,
                                        const Tc* z,
@@ -54,6 +54,8 @@ extern void computeLeafSourceCenterGpu(const Tc* x,
                                        const TreeNodeIndex* leafToInternal,
                                        TreeNodeIndex numLeaves,
                                        const LocalIndex* layout,
+                                       const KeyType* prefixes,
+                                       const Box<Tc>& box,
                                        Vec4<Tf>* centers);
 
 /*! @brief compute center of gravity for internal nodes with an upsweep
