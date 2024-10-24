@@ -66,10 +66,12 @@ extern void computeLeafSourceCenterGpu(const Tc* x,
  * @param[in]    childOffsets  indices of first child node of each node
  * @param[inout] centers       center of mass coordinates with leaf node centers set
  */
-template<class T>
+template<class T, class KeyType>
 extern void upsweepCentersGpu(int numLevels,
                               const TreeNodeIndex* levelRange,
                               const TreeNodeIndex* childOffsets,
+                              const KeyType* nodeKeys,
+                              const Box<T>& box,
                               SourceCenterType<T>* centers);
 
 //! @brief compute geometric node center and sizes based on node SFC keys

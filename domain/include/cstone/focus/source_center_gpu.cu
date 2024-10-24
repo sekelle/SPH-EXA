@@ -59,7 +59,7 @@ __global__ void computeLeafSourceCenterKernel(const Tc* x,
     IBox cellBox              = sfcIBox(sfcKey(nodeKey), prefixLength / 3);
     auto [geoCenter, geoSize] = centerAndSize<KeyType>(cellBox, box);
 
-    if (layout[leafIdx] == layout[leafIdx + 1])
+    if (layout[leafIdx] >= layout[leafIdx + 1])
     {
         centers[nodeIdx] = {geoCenter[0], geoCenter[1], geoCenter[2], Tf(0)};
     }
@@ -113,10 +113,12 @@ COMPUTE_LEAF_SOURCE_CENTER_GPU(double, double, double, uint64_t);
 COMPUTE_LEAF_SOURCE_CENTER_GPU(double, float, double, uint64_t);
 COMPUTE_LEAF_SOURCE_CENTER_GPU(float, float, float, uint64_t);
 
-template<class T>
+template<class T, class KeyType>
 __global__ void upsweepCentersKernel(TreeNodeIndex firstCell,
                                      TreeNodeIndex lastCell,
                                      const TreeNodeIndex* childOffsets,
+                                     const KeyType* nodeKeys,
+                                     Box<T> box,
                                      SourceCenterType<T>* centers)
 {
     const int cellIdx = blockIdx.x * blockDim.x + threadIdx.x + firstCell;
@@ -124,13 +126,33 @@ __global__ void upsweepCentersKernel(TreeNodeIndex firstCell,
 
     TreeNodeIndex firstChild = childOffsets[cellIdx];
 
-    if (firstChild) { centers[cellIdx] = CombineSourceCenter<T>{}(cellIdx, firstChild, centers); }
+    if (firstChild)
+    {
+        centers[cellIdx] = CombineSourceCenter<T>{}(cellIdx, firstChild, centers);
+
+        KeyType nodeKey  = decodePlaceholderBit(nodeKeys[cellIdx]);
+        int prefixLength = decodePrefixLength(nodeKeys[cellIdx]);
+
+        IBox cellBox              = sfcIBox(sfcKey(nodeKey), prefixLength / 3);
+        auto [geoCenter, geoSize] = centerAndSize<KeyType>(cellBox, box);
+
+        if (centers[cellIdx][3] == 0)
+        {
+            centers[cellIdx] = {geoCenter[0], geoCenter[1], geoCenter[2], T(0)};
+        }
+
+        Vec3<T> dX    = makeVec3(centers[cellIdx]) - geoCenter;
+        float diagonal = sqrt(norm2(geoSize));
+        assert(diagonal >= sqrt(norm2(dX)));
+    }
 }
 
-template<class T>
+template<class T, class KeyType>
 void upsweepCentersGpu(int numLevels,
                        const TreeNodeIndex* levelRange,
                        const TreeNodeIndex* childOffsets,
+                       const KeyType* nodeKeys,
+                       const Box<T>& box,
                        SourceCenterType<T>* centers)
 {
     constexpr int numThreads = 256;
@@ -142,13 +164,22 @@ void upsweepCentersGpu(int numLevels,
         if (numCellsLevel)
         {
             upsweepCentersKernel<<<numBlocks, numThreads>>>(levelRange[level], levelRange[level + 1], childOffsets,
-                                                            centers);
+                                                            nodeKeys, box, centers);
         }
     }
 }
 
-template void upsweepCentersGpu(int, const TreeNodeIndex*, const TreeNodeIndex*, SourceCenterType<float>*);
-template void upsweepCentersGpu(int, const TreeNodeIndex*, const TreeNodeIndex*, SourceCenterType<double>*);
+#define UPSWEEP_CENTERS_GPU(T, KeyType) template void upsweepCentersGpu(int numLevels,\
+                       const TreeNodeIndex* levelRange, \
+                       const TreeNodeIndex* childOffsets, \
+                       const KeyType* nodeKeys,\
+                       const Box<T>& box,\
+                       SourceCenterType<T>* centers)
+
+UPSWEEP_CENTERS_GPU(float, uint32_t);
+UPSWEEP_CENTERS_GPU(float, uint64_t);
+UPSWEEP_CENTERS_GPU(double, uint32_t);
+UPSWEEP_CENTERS_GPU(double, uint64_t);
 
 template<class KeyType, class T>
 __global__ void computeGeoCentersKernel(

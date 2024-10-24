@@ -370,7 +370,7 @@ public:
                                        d_layout, octree.prefixes, box, rawPtr(centersAcc_));
             //! upsweep with local data in place
             upsweepCentersGpu(maxTreeLevel<KeyType>{}, treeData_.levelRange.data(), octree.childOffsets,
-                              rawPtr(centersAcc_));
+                              octree.prefixes, box, rawPtr(centersAcc_));
             memcpyD2H(rawPtr(centersAcc_), numNodes, centers_.data());
 
             reallocate(scratch1, osz1, 1.0);
