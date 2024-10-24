@@ -89,8 +89,10 @@ void countRequestParticles(gsl::span<const KeyType> leaves,
         assert(endIdx < leaves.size());
         if (endKey != leaves[endIdx])
         {
+            int myRank;
+            MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
             std::cout << "Let leaf " << std::oct << startKey << " " << endKey << " found " << leaves[startIdx] << " " << leaves[endIdx]
-                << std::dec << std::endl;
+                << std::dec << "on rank " << myRank << std::endl;
             std::cout << startIdx << " " << endIdx << std::endl;
         }
 
