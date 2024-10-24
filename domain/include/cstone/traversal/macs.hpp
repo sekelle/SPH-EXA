@@ -89,9 +89,46 @@ HOST_DEVICE_FUN T computeVecMacR2(KeyType prefix, Vec3<T> expCenter, float invTh
 
     Vec3<T> dX = expCenter - geoCenter;
 
+    float epsilon = 0.f;
+    if (invTheta > 2.f)
+    {
+        epsilon = invTheta - 2.f;
+        invTheta = 2.f;
+    }
+
     T s   = sqrt(norm2(dX));
     T l   = T(2.0) * max(geoSize);
-    T mac = l * invTheta + s;
+
+    // safety margin due to smaller theta
+    float epsL = epsilon * l;
+
+    float XToCorner = sqrt(norm2(abs(geoSize) - abs(dX)));
+    float diagonal = sqrt(norm2(geoSize));
+
+    if (s > diagonal)
+    {
+        s = diagonal;
+        XToCorner = 0;
+    }
+
+    T mac = l * invTheta + stl::min(float(s) + epsL, XToCorner + diagonal);
+    //T mac = l * invTheta + s + epsL;
+
+    //if (float(s) + epsL > XToCorner + diagonal) printf("  MAC limited\n");
+
+    if (prefix == 01431325)
+    {
+        printf("itheta %f eps %f s %f l %f XC %f diag %f std %f mod %f exp\n",
+                invTheta, epsilon, s, l, XToCorner, diagonal, l*invTheta + s + epsL, mac
+                /*expCenter[0], expCenter[1], expCenter[2],
+                geoCenter[0] - geoSize[0],
+                geoCenter[0] + geoSize[0],
+                geoCenter[1] - geoSize[1],
+                geoCenter[1] + geoSize[1],
+                geoCenter[2] - geoSize[2],
+                geoCenter[2] + geoSize[2]*/
+                );
+    }
 
     return mac * mac;
 }
@@ -218,6 +255,11 @@ HOST_DEVICE_FUN void markMacPerBox(const Vec3<T>& targetCenter,
         bool violatesMac =
             evaluateMacPbc(makeVec3(center), center[3], targetCenter, targetSize, box) && sourceLevel <= maxSourceLevel;
         if (violatesMac && !markings[idx]) { markings[idx] = 1; }
+
+        if (violatesMac && focusStart == 053263000000000000000lu && nodeStart == 0431325000000000000000lu && nodeEnd == 0431326000000000000000lu)
+        {
+            printf("MAC node 431325: %d\n", int(violatesMac));
+        }
 
         return violatesMac;
     };
