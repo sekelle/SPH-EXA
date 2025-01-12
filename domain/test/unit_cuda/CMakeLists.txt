@@ -27,7 +27,7 @@ set(testname component_units_cuda)
 
 if(CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
     add_library(gpu_unit_obj OBJECT ${UNIT_TEST_SOURCES_GPU})
-    target_link_libraries(gpu_unit_obj PUBLIC cstone_gpu OpenMP::OpenMP_CXX GTest::gtest_main)
+    target_link_libraries(gpu_unit_obj PUBLIC cstone_gpu GTest::gtest_main)
     target_include_directories(gpu_unit_obj PRIVATE ${PROJECT_SOURCE_DIR}/include)
     target_include_directories(gpu_unit_obj PRIVATE ${PROJECT_SOURCE_DIR}/test)
 

@@ -15,7 +15,7 @@ if(CMAKE_CUDA_COMPILER) # disabled for HIP
         target_link_libraries(hilbert_perf PRIVATE CUDA::cudart)
     else ()
         #set_source_files_properties(hilbert.cpp PROPERTIES LANGUAGE HIP)
-        target_link_libraries(hilbert_perf PRIVATE OpenMP::OpenMP_CXX hip::host)
+        target_link_libraries(hilbert_perf PRIVATE hip::host)
     endif ()
 endif ()
 
