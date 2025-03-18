@@ -71,6 +71,23 @@ auto restoreData(IFileReader* reader, SimulationData& simData)
     return box;
 }
 
+template<class T>
+void modifyTags(std::span<T> x, std::span<T> y, std::span<T> z, std::span<uint64_t> id)
+{
+    cstone::Vec3<T> sphere{0.25, 0.25, 0.25};
+    T radius = 0.1;
+
+#pragma omp parallel for schedule(static)
+    for (int i = 0; i < x.size(); ++i)
+    {
+        cstone::Vec3<T> Xi{x[i], y[i], z[i]};
+        auto dist2 = norm2(Xi - sphere);
+
+        if (dist2 < radius * radius) { id[i] = 1; }
+        else { id[i] = 0; }
+    }
+}
+
 template<class Dataset>
 class FileInit : public ISimInitializer<Dataset>
 {
@@ -93,6 +110,8 @@ public:
         reader->setStep(h5_fname, initStep, FileMode::collective);
         auto box = restoreData(reader, simData);
         reader->closeStep();
+
+        modifyTags<typename Dataset::RealType>(simData.hydro.x, simData.hydro.y, simData.hydro.z, simData.hydro.id);
         return box;
     }
 
