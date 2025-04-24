@@ -20,6 +20,7 @@
 #include "cstone/primitives/warpscan.cuh"
 #include "cstone/sfc/box.hpp"
 #include "cstone/findneighbors.hpp"
+#include "cstone/traversal/traversal.hpp"
 #include "cstone/tree/definitions.h"
 #include "cstone/tree/octree.hpp"
 
@@ -156,6 +157,60 @@ __device__ __forceinline__ bool tightOverlap(int laneIdx,
         if (lane == laneIdx) { isTightClose = anyOverlaps; }
     }
     return isTightClose;
+}
+
+template<bool UsePbc, class Tc, class Th, class KeyType>
+__device__ uint2 traverseWarpDfs(unsigned* nc_i,
+                                 unsigned* nidx_i,
+                                 unsigned ngmax,
+                                 const util::array<Vec4<Tc>, TravConfig::nwt>& pos_i,
+                                 const Vec3<Tc> targetCenter,
+                                 const Vec3<Tc> targetSize,
+                                 const Tc* __restrict__ x,
+                                 const Tc* __restrict__ y,
+                                 const Tc* __restrict__ z,
+                                 const Th* __restrict__ /*h*/,
+                                 const OctreeNsView<Tc, KeyType>& tree,
+                                 int initNodeIdx,
+                                 const Box<Tc>& box,
+                                 volatile int* tempQueue,
+                                 int* cellQueue)
+{
+    const TreeNodeIndex* __restrict__ childOffsets   = tree.childOffsets;
+    const TreeNodeIndex* __restrict__ parents        = tree.parents;
+    const TreeNodeIndex* __restrict__ internalToLeaf = tree.internalToLeaf;
+    const LocalIndex* __restrict__ layout            = tree.layout;
+    const Vec3<Tc>* __restrict__ centers             = tree.centers;
+    const Vec3<Tc>* __restrict__ sizes               = tree.sizes;
+
+    const int laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
+
+    unsigned p2pCounter = 0;
+
+    auto overlaps = [targetCenter, targetSize, centers, sizes, &box](TreeNodeIndex idx)
+    { return cellOverlap<UsePbc>(targetCenter, targetSize, centers[idx], sizes[idx], box); };
+
+    auto searchBox =
+        [laneIdx, internalToLeaf, layout, x, y, z, &pos_i, &box, ngmax, nc_i, nidx_i, &p2pCounter](TreeNodeIndex idx)
+    {
+        TreeNodeIndex leafIdx = internalToLeaf[idx];
+        LocalIndex firstBody  = layout[leafIdx];
+        LocalIndex lastBody   = layout[leafIdx + 1];
+
+        while (firstBody < lastBody)
+        {
+            LocalIndex bodyIdx  = imin(firstBody + laneIdx, lastBody - 1);
+            LocalIndex numValid = imin(GpuConfig::warpSize, int(lastBody - firstBody));
+            Vec3<Tc> sourceBody{x[bodyIdx], y[bodyIdx], z[bodyIdx]};
+            countNeighbors<UsePbc>(sourceBody, numValid, pos_i, box, bodyIdx, ngmax, nc_i, nidx_i);
+            p2pCounter += numValid;
+            firstBody += GpuConfig::warpSize;
+        }
+    };
+
+    dfsStackless(childOffsets, parents, overlaps, searchBox);
+
+    return {p2pCounter, 0};
 }
 
 /*! @brief traverse one warp with up to TravConfig::targetSize target bodies down the tree
