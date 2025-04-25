@@ -207,6 +207,20 @@ __device__ uint2 traverseWarpDfs(unsigned* nc_i,
         LocalIndex firstBody  = layout[leafIdx];
         LocalIndex lastBody   = layout[leafIdx + 1];
 
+        int numPush = imin(int(lastBody - firstBody), GpuConfig::warpSize - fillLevel);
+        // push new bodies onto queue
+        if (laneIdx >= fillLevel) { bodyQueue = firstBody + laneIdx - fillLevel; }
+        fillLevel += numPush;
+        firstBody += numPush;
+
+        if (fillLevel == GpuConfig::warpSize) // if queue spilled
+        {
+            Vec3<Tc> sourceBody{x[bodyQueue], y[bodyQueue], z[bodyQueue]};
+            countNeighbors<UsePbc>(sourceBody, GpuConfig::warpSize, pos_i, box, bodyQueue, ngmax, nc_i, nidx_i);
+            p2pCounter += GpuConfig::warpSize;
+            fillLevel = 0;
+        }
+
         while (lastBody - firstBody >= GpuConfig::warpSize)
         {
             LocalIndex bodyIdx  = firstBody + laneIdx;
@@ -216,20 +230,12 @@ __device__ uint2 traverseWarpDfs(unsigned* nc_i,
             firstBody += GpuConfig::warpSize;
         }
 
-        LocalIndex numPush = lastBody - firstBody;
         // push remaining bodies onto queue
-        if (laneIdx >= fillLevel) { bodyQueue = firstBody + laneIdx - fillLevel; }
-        fillLevel += numPush;
-
-        if (fillLevel >= GpuConfig::warpSize) // if queue spilled
+        numPush = lastBody - firstBody;
+        if (numPush)
         {
-            Vec3<Tc> sourceBody{x[bodyQueue], y[bodyQueue], z[bodyQueue]};
-            countNeighbors<UsePbc>(sourceBody, GpuConfig::warpSize, pos_i, box, bodyQueue, ngmax, nc_i, nidx_i);
-            p2pCounter += GpuConfig::warpSize;
-            fillLevel -= GpuConfig::warpSize; // fillLevel = numRemain
-            firstBody += numPush - fillLevel;
-            // bodyQueue is now empty; put indices that spilled into the queue
-            if (laneIdx < fillLevel) { bodyQueue = firstBody + laneIdx; }
+            bodyQueue = firstBody + laneIdx;
+            fillLevel = numPush;
         }
     };
 
