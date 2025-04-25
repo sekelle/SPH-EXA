@@ -190,25 +190,51 @@ __device__ uint2 traverseWarpDfs(unsigned* nc_i,
     auto overlaps = [targetCenter, targetSize, centers, sizes, &box](TreeNodeIndex idx)
     { return cellOverlap<UsePbc>(targetCenter, targetSize, centers[idx], sizes[idx], box); };
 
-    auto searchBox =
-        [laneIdx, internalToLeaf, layout, x, y, z, &pos_i, &box, ngmax, nc_i, nidx_i, &p2pCounter](TreeNodeIndex idx)
+    int bodyQueue = 0, fillLevel = 0;
+    auto searchBox = [laneIdx, internalToLeaf, layout, x, y, z, &pos_i, &box, ngmax, nc_i, nidx_i, &p2pCounter,
+                      &bodyQueue, &fillLevel](TreeNodeIndex idx)
     {
+        if (idx == -1)
+        {
+            Vec3<Tc> sourceBody =
+                laneIdx < fillLevel ? Vec3<Tc>{x[bodyQueue], y[bodyQueue], z[bodyQueue]} : Vec3<Tc>{0, 0, 0};
+            countNeighbors<UsePbc>(sourceBody, fillLevel, pos_i, box, bodyQueue, ngmax, nc_i, nidx_i);
+            p2pCounter += fillLevel;
+            return;
+        }
+
         TreeNodeIndex leafIdx = internalToLeaf[idx];
         LocalIndex firstBody  = layout[leafIdx];
         LocalIndex lastBody   = layout[leafIdx + 1];
 
-        while (firstBody < lastBody)
+        while (lastBody - firstBody >= GpuConfig::warpSize)
         {
-            LocalIndex bodyIdx  = imin(firstBody + laneIdx, lastBody - 1);
-            LocalIndex numValid = imin(GpuConfig::warpSize, int(lastBody - firstBody));
+            LocalIndex bodyIdx  = firstBody + laneIdx;
             Vec3<Tc> sourceBody{x[bodyIdx], y[bodyIdx], z[bodyIdx]};
-            countNeighbors<UsePbc>(sourceBody, numValid, pos_i, box, bodyIdx, ngmax, nc_i, nidx_i);
-            p2pCounter += numValid;
+            countNeighbors<UsePbc>(sourceBody, GpuConfig::warpSize, pos_i, box, bodyIdx, ngmax, nc_i, nidx_i);
+            p2pCounter += GpuConfig::warpSize;
             firstBody += GpuConfig::warpSize;
+        }
+
+        LocalIndex numPush = lastBody - firstBody;
+        // push remaining bodies onto queue
+        if (laneIdx >= fillLevel) { bodyQueue = firstBody + laneIdx - fillLevel; }
+        fillLevel += numPush;
+
+        if (fillLevel >= GpuConfig::warpSize) // if queue spilled
+        {
+            Vec3<Tc> sourceBody{x[bodyQueue], y[bodyQueue], z[bodyQueue]};
+            countNeighbors<UsePbc>(sourceBody, GpuConfig::warpSize, pos_i, box, bodyQueue, ngmax, nc_i, nidx_i);
+            p2pCounter += GpuConfig::warpSize;
+            fillLevel -= GpuConfig::warpSize; // fillLevel = numRemain
+            firstBody += numPush - fillLevel;
+            // bodyQueue is now empty; put indices that spilled into the queue
+            if (laneIdx < fillLevel) { bodyQueue = firstBody + laneIdx; }
         }
     };
 
     dfsStackless(childOffsets, parents, overlaps, searchBox);
+    searchBox(-1); // process left-over bodies
 
     return {p2pCounter, 0};
 }
