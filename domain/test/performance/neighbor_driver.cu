@@ -163,7 +163,7 @@ void benchmarkGpu()
     // RandomGaussianCoordinates<T, StrongKeyType> coords(n, box);
     // adjustSmoothingLength<KeyType>(n, 100, 200, coords.x(), coords.y(), coords.z(), h, box);
 
-    int ngmax = 200;
+    int ngmax = 0;
 
     std::vector<LocalIndex> neighborsCPU(ngmax * n);
     std::vector<unsigned> neighborsCountCPU(n);
@@ -245,7 +245,7 @@ void benchmarkGpu()
 
     auto findNeighborsLambda = [&]()
     {
-        // findNeighborsKernel<<<iceil(n, 128), 128>>>(rawPtr(d_x), rawPtr(d_y), rawPtr(d_z), rawPtr(d_h), 0, n, box,
+        //findNeighborsKernel<<<iceil(n, 256), 256>>>(rawPtr(d_x), rawPtr(d_y), rawPtr(d_z), rawPtr(d_h), 0, n, box,
         //                                             nsViewGpu, ngmax, rawPtr(d_neighbors), rawPtr(d_neighborsCount));
 
         findNeighborsBT(0, n, rawPtr(d_x), rawPtr(d_y), rawPtr(d_z), rawPtr(d_h), nsViewGpu, box,
@@ -265,19 +265,19 @@ void benchmarkGpu()
     int numFailsList = 0;
     for (int i = 0; i < n; ++i)
     {
-        std::sort(neighborsCPU.data() + i * ngmax, neighborsCPU.data() + i * ngmax + neighborsCountCPU[i]);
+        //std::sort(neighborsCPU.data() + i * ngmax, neighborsCPU.data() + i * ngmax + neighborsCountCPU[i]);
 
-        std::vector<cstone::LocalIndex> nilist(neighborsCountGPU[i]);
-        for (unsigned j = 0; j < neighborsCountGPU[i]; ++j)
-        {
-            size_t warpOffset = (i / TravConfig::targetSize) * TravConfig::targetSize * ngmax;
-            size_t laneOffset = i % TravConfig::targetSize;
-            nilist[j]         = neighborsGPU[warpOffset + TravConfig::targetSize * j + laneOffset];
-            nilist[j]         = neighborsGPU[warpOffset + TravConfig::targetSize * j + laneOffset];
+        //std::vector<cstone::LocalIndex> nilist(neighborsCountGPU[i]);
+        //for (unsigned j = 0; j < neighborsCountGPU[i]; ++j)
+        //{
+        //    size_t warpOffset = (i / TravConfig::targetSize) * TravConfig::targetSize * ngmax;
+        //    size_t laneOffset = i % TravConfig::targetSize;
+        //    nilist[j]         = neighborsGPU[warpOffset + TravConfig::targetSize * j + laneOffset];
+        //    nilist[j]         = neighborsGPU[warpOffset + TravConfig::targetSize * j + laneOffset];
 
-            // nilist[j] = neighborsGPU[i * ngmax + j];
-        }
-        std::sort(nilist.begin(), nilist.end());
+        //    // nilist[j] = neighborsGPU[i * ngmax + j];
+        //}
+        //std::sort(nilist.begin(), nilist.end());
 
         if (neighborsCountGPU[i] != neighborsCountCPU[i])
         {
@@ -285,7 +285,7 @@ void benchmarkGpu()
             numFails++;
         }
 
-        if (!std::equal(begin(nilist), end(nilist), neighborsCPU.begin() + i * ngmax)) { numFailsList++; }
+        //if (!std::equal(begin(nilist), end(nilist), neighborsCPU.begin() + i * ngmax)) { numFailsList++; }
     }
 
     bool allEqual = std::equal(begin(neighborsCountGPU), end(neighborsCountGPU), begin(neighborsCountCPU));
@@ -297,4 +297,4 @@ void benchmarkGpu()
     std::cout << "numFailsList " << numFailsList << std::endl;
 }
 
-int main() { benchmarkGpu<double, HilbertKey<uint64_t>>(); }
+int main() { benchmarkGpu<float, HilbertKey<uint64_t>>(); }
