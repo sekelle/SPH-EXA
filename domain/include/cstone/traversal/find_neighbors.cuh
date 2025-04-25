@@ -107,6 +107,47 @@ __device__ void countNeighbors(Vec3<Tc> sourceBody,
     }
 }
 
+template<bool UsePbc, class Tc>
+__device__ void countNeighbors(const Tc* __restrict__ x,
+                               const Tc* __restrict__ y,
+                               const Tc* __restrict__ z,
+                               int numLanesValid,
+                               const util::array<Vec4<Tc>, TravConfig::nwt>& pos_i,
+                               const Box<Tc>& box,
+                               LocalIndex sourceBodyIdx,
+                               unsigned ngmax,
+                               unsigned nc_i[TravConfig::nwt],
+                               unsigned* nidx_i)
+{
+    unsigned laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
+    unsigned warpIdx = threadIdx.x >> GpuConfig::warpSizeLog2;
+
+    __shared__ Vec3<Tc> sourceBodies_[TravConfig::numThreads];
+    auto* sourceBodies = sourceBodies_ + GpuConfig::warpSize * warpIdx;
+    if (laneIdx < numLanesValid) { sourceBodies[laneIdx] = {x[sourceBodyIdx], y[sourceBodyIdx], z[sourceBodyIdx]}; }
+    syncWarp();
+
+    for (int j = 0; j < numLanesValid; j++)
+    {
+        auto pos_j = sourceBodies[j];
+        LocalIndex idx_j = shflSync(sourceBodyIdx, j);
+
+#pragma unroll
+        for (int k = 0; k < TravConfig::nwt; k++)
+        {
+            Tc d2 = distanceSq<UsePbc>(pos_j[0], pos_j[1], pos_j[2], pos_i[k][0], pos_i[k][1], pos_i[k][2], box);
+            if (d2 < pos_i[k][3] && d2 > Tc(0.0))
+            {
+                if (nc_i[k] < ngmax)
+                {
+                    nidx_i[nc_i[k] * TravConfig::targetSize + laneIdx + k * GpuConfig::warpSize] = idx_j;
+                }
+                nc_i[k]++;
+            }
+        }
+    }
+}
+
 template<bool UsePbc, class T, std::enable_if_t<UsePbc, int> = 0>
 __device__ __forceinline__ bool cellOverlap(const Vec3<T>& curSrcCenter,
                                             const Vec3<T>& curSrcSize,
@@ -288,8 +329,9 @@ __device__ unsigned searchCells(LocalIndex firstBody_lane,
 
         if (fillLevel == GpuConfig::warpSize) // if queue spilled
         {
-            Vec3<Tc> sourceBody{x[bodyQueue], y[bodyQueue], z[bodyQueue]};
-            countNeighbors<UsePbc>(sourceBody, GpuConfig::warpSize, pos_i, box, bodyQueue, ngmax, nc_i, nidx_i);
+            //Vec3<Tc> sourceBody{x[bodyQueue], y[bodyQueue], z[bodyQueue]};
+            //countNeighbors<UsePbc>(sourceBody, GpuConfig::warpSize, pos_i, box, bodyQueue, ngmax, nc_i, nidx_i);
+            countNeighbors<UsePbc>(x, y, z, GpuConfig::warpSize, pos_i, box, bodyQueue, ngmax, nc_i, nidx_i);
             p2pCounter += GpuConfig::warpSize;
             fillLevel = 0;
         }
@@ -297,8 +339,9 @@ __device__ unsigned searchCells(LocalIndex firstBody_lane,
         while (lastBody - firstBody >= GpuConfig::warpSize)
         {
             LocalIndex bodyIdx  = firstBody + laneIdx;
-            Vec3<Tc> sourceBody{x[bodyIdx], y[bodyIdx], z[bodyIdx]};
-            countNeighbors<UsePbc>(sourceBody, GpuConfig::warpSize, pos_i, box, bodyIdx, ngmax, nc_i, nidx_i);
+            //Vec3<Tc> sourceBody{x[bodyIdx], y[bodyIdx], z[bodyIdx]};
+            //countNeighbors<UsePbc>(sourceBody, GpuConfig::warpSize, pos_i, box, bodyIdx, ngmax, nc_i, nidx_i);
+            countNeighbors<UsePbc>(x, y, z, GpuConfig::warpSize, pos_i, box, bodyIdx, ngmax, nc_i, nidx_i);
             p2pCounter += GpuConfig::warpSize;
             firstBody += GpuConfig::warpSize;
         }
