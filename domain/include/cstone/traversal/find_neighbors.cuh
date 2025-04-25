@@ -245,6 +245,76 @@ __device__ uint2 traverseWarpDfs(unsigned* nc_i,
     return {p2pCounter, 0};
 }
 
+template<bool UsePbc, class Tc>
+__device__ unsigned searchCells(LocalIndex firstBody_lane,
+                                LocalIndex numBodies_lane,
+                                int& bodyQueue,
+                                int& fillLevel,
+                                unsigned* nc_i,
+                                unsigned* nidx_i,
+                                unsigned ngmax,
+                                const util::array<Vec4<Tc>, TravConfig::nwt>& pos_i,
+                                const Tc* __restrict__ x,
+                                const Tc* __restrict__ y,
+                                const Tc* __restrict__ z,
+                                const Box<Tc>& box,
+                                volatile int* sm_numBodies)
+{
+    const int laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
+    //const unsigned warpIdx = threadIdx.x >> GpuConfig::warpSizeLog2;
+
+    unsigned p2pCounter = 0;
+
+    //__shared__ LocalIndex sm_firstBodies[TravConfig::numThreads];
+    //LocalIndex* sm_firstBody = sm_firstBodies + warpIdx * GpuConfig::warpSize;
+
+    //sm_firstBody[laneIdx] = firstBody_lane;
+    //sm_numBodies[laneIdx] = numBodies_lane;
+    //syncWarp();
+
+    for (int j = 0; j < GpuConfig::warpSize; ++j)
+    {
+        LocalIndex numBodies = shflSync(numBodies_lane, j);
+        if (numBodies == 0) { continue; }
+
+        LocalIndex firstBody      = shflSync(firstBody_lane, j);
+        const LocalIndex lastBody = firstBody + numBodies;
+
+        int numPush = imin(int(lastBody - firstBody), GpuConfig::warpSize - fillLevel);
+        // push new bodies onto queue
+        if (laneIdx >= fillLevel) { bodyQueue = firstBody + laneIdx - fillLevel; }
+        fillLevel += numPush;
+        firstBody += numPush;
+
+        if (fillLevel == GpuConfig::warpSize) // if queue spilled
+        {
+            Vec3<Tc> sourceBody{x[bodyQueue], y[bodyQueue], z[bodyQueue]};
+            countNeighbors<UsePbc>(sourceBody, GpuConfig::warpSize, pos_i, box, bodyQueue, ngmax, nc_i, nidx_i);
+            p2pCounter += GpuConfig::warpSize;
+            fillLevel = 0;
+        }
+
+        while (lastBody - firstBody >= GpuConfig::warpSize)
+        {
+            LocalIndex bodyIdx  = firstBody + laneIdx;
+            Vec3<Tc> sourceBody{x[bodyIdx], y[bodyIdx], z[bodyIdx]};
+            countNeighbors<UsePbc>(sourceBody, GpuConfig::warpSize, pos_i, box, bodyIdx, ngmax, nc_i, nidx_i);
+            p2pCounter += GpuConfig::warpSize;
+            firstBody += GpuConfig::warpSize;
+        }
+
+        // push remaining bodies onto queue
+        numPush = lastBody - firstBody;
+        if (numPush)
+        {
+            bodyQueue = firstBody + laneIdx;
+            fillLevel = numPush;
+        }
+    }
+
+    return p2pCounter;
+}
+
 /*! @brief traverse one warp with up to TravConfig::targetSize target bodies down the tree
  *
  * @param[inout] nc_i           output neighbor counts to add to, TravConfig::nwt per lane
@@ -343,6 +413,11 @@ __device__ uint2 traverseWarp(unsigned* nc_i,
         // Direct
         const int firstBody     = layout[leafIdx];
         const int numBodies     = (layout[leafIdx + 1] - firstBody) & -int(isDirect); // Number of bodies in cell
+
+        p2pCounter += searchCells<UsePbc>(firstBody, numBodies, bodyQueue, bdyFillLevel, nc_i, nidx_i, ngmax, pos_i, x,
+                                          y, z, box, tempQueue);
+
+        /*
         bool directTodo         = numBodies;
         const int numBodiesScan = inclusiveScanInt(numBodies);                      // Inclusive scan of numBodies
         int numBodiesLane       = numBodiesScan - numBodies;                        // Exclusive scan of numBodies
@@ -389,6 +464,7 @@ __device__ uint2 traverseWarp(unsigned* nc_i,
                 numBodiesWarp = 0; // No more bodies to process from current source cells
             }
         }
+        */
 
         //  If the current level is done
         if (sourceOffset >= numSources)
