@@ -280,7 +280,24 @@ __device__ uint2 traverseWarpDfs(unsigned* nc_i,
         }
     };
 
-    dfsStackless(childOffsets, parents, overlaps, searchBox);
+    TreeNodeIndex enclosingIdx = 0;
+
+    auto tmin = targetCenter - targetSize;
+    auto tmax = targetCenter + targetSize;
+
+    bool computeEnclosure = tmin[0] >= box.xmin() && tmin[1] >= box.ymin() && tmin[2] >= box.zmin() &&
+                            tmax[0] < box.xmax() && tmax[1] < box.ymax() && tmax[2] < box.zmax();
+    if (computeEnclosure)
+    {
+        KeyType enclosingNode = commonNodePrefix<SfcKind<KeyType>>(targetCenter, targetSize, box);
+        unsigned level        = decodePrefixLength(enclosingNode) / 3;
+        enclosingIdx          = stl::lower_bound(tree.prefixes + tree.levelRange[level],
+                                                 tree.prefixes + tree.levelRange[level + 1], enclosingNode) -
+                       tree.prefixes;
+        if (tree.prefixes[enclosingIdx] != enclosingNode) { enclosingIdx = 0; }
+    }
+
+    dfsStackless(childOffsets, parents, overlaps, searchBox, enclosingIdx);
     searchBox(-1); // process left-over bodies
 
     return {p2pCounter, 0};
@@ -671,13 +688,13 @@ __device__ util::array<unsigned, TravConfig::nwt> traverseNeighbors(cstone::Loca
     uint2 warpStats;
     if (usePbc)
     {
-        warpStats = traverseWarp<true>(nc_i.data(), warpNidx, ngmax, pos_i, targetCenter, targetSize, x, y, z, h, tree,
-                                       initNode, box, tempQueue, cellQueue);
+        warpStats = traverseWarpDfs<true>(nc_i.data(), warpNidx, ngmax, pos_i, targetCenter, targetSize, x, y, z, h,
+                                          tree, initNode, box, tempQueue, cellQueue);
     }
     else
     {
-        warpStats = traverseWarp<false>(nc_i.data(), warpNidx, ngmax, pos_i, targetCenter, targetSize, x, y, z, h, tree,
-                                        initNode, box, tempQueue, cellQueue);
+        warpStats = traverseWarpDfs<false>(nc_i.data(), warpNidx, ngmax, pos_i, targetCenter, targetSize, x, y, z, h,
+                                           tree, initNode, box, tempQueue, cellQueue);
     }
     unsigned numP2P   = warpStats.x;
     unsigned maxStack = warpStats.y;

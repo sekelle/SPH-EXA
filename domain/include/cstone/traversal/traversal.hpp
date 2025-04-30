@@ -52,9 +52,9 @@ template<class C, class A>
 HOST_DEVICE_FUN void dfsStackless(const TreeNodeIndex* childOffsets,
                                   const TreeNodeIndex* parents,
                                   C&& continuationCriterion,
-                                  A&& endpointAction)
+                                  A&& endpointAction,
+                                  TreeNodeIndex initNode = 0)
 {
-    TreeNodeIndex initNode = 0;
     if (!continuationCriterion(initNode)) { return; }
 
     if (childOffsets[initNode] == 0)

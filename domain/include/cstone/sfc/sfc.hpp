@@ -214,6 +214,17 @@ HOST_DEVICE_FUN inline IBox sfcIBox(KeyType keyStart, KeyType keyEnd) noexcept
     return sfcIBox(keyStart, treeLevel(keyEnd - keyStart));
 }
 
+template<class T>
+HOST_DEVICE_FUN bool insideBox_(const Vec3<T>& center, const Vec3<T>& size, const Box<T>& box)
+{
+    Vec3<T> globalMin{box.xmin(), box.ymin(), box.zmin()};
+    Vec3<T> globalMax{box.xmax(), box.ymax(), box.zmax()};
+    Vec3<T> boxMin = center - size;
+    Vec3<T> boxMax = center + size;
+    return boxMin[0] >= globalMin[0] && boxMin[1] >= globalMin[1] && boxMin[2] >= globalMin[2] &&
+           boxMax[0] <= globalMax[0] && boxMax[1] <= globalMax[1] && boxMax[2] <= globalMax[2];
+}
+
 //! @brief Compute the smallest octree node in placeholder-bit format that contains the given floating point box
 template<class KeyType, class T>
 HOST_DEVICE_FUN inline KeyType commonNodePrefix(Vec3<T> center, Vec3<T> size, const cstone::Box<T>& box)
@@ -223,6 +234,28 @@ HOST_DEVICE_FUN inline KeyType commonNodePrefix(Vec3<T> center, Vec3<T> size, co
 
     unsigned level  = commonPrefix(lowerKey, upperKey) / 3;
     KeyType nodeKey = enclosingBoxCode(lowerKey, level);
+
+#ifdef __CUDA_ARCH__1
+    int laneIdx = threadIdx.x & 31;
+
+    auto ibox = sfcIBox(SfcKind(decodePlaceholderBit(nodeKey.value())), level);
+    auto b = createFpBox<KeyType>(ibox, box);
+
+    bool pass = insideBox_(center, size, {b.xmin(), b.xmax(), b.ymin(), b.ymax(), b.zmin(), b.zmax()});
+    if (laneIdx == 0 && !pass && nodeKey > 0)
+    {
+        printf("nk %lo, %f %f %f %f %f %f | %f %f %f %f %f %f\n", encodePlaceholderBit(nodeKey.value(), 3 * level),
+            b.xmin(), b.xmax(), b.ymin(), b.ymax(), b.zmin(), b.zmax(),
+            center[0] - size[0],
+            center[0] + size[0],
+            center[1] - size[1],
+            center[1] + size[1],
+            center[2] - size[2],
+            center[2] + size[2]
+            );
+    }
+    if (!pass) { return KeyType(1); }
+#endif
 
     return KeyType(encodePlaceholderBit(nodeKey.value(), 3 * level));
 }
