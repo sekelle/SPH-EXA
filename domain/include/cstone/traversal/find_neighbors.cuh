@@ -155,7 +155,7 @@ HOST_DEVICE_FUN T applyPbcComp(T dx, T box_l, T box_il)
     return dx - box_l * std::rint(dx * box_il);
 }
 
-template<class T>
+template<bool UsePbc, class T, std::enable_if_t<UsePbc, int> = 0>
 __device__ __forceinline__ bool minDistanceComp(T srcC, T srcS, T tarC, T tarS, T box_l, T box_il)
 {
     T dx = tarC - srcC;
@@ -165,32 +165,22 @@ __device__ __forceinline__ bool minDistanceComp(T srcC, T srcS, T tarC, T tarS, 
     return dx <= T(0);
 }
 
-template<class T>
-__device__ __forceinline__ bool cellOverlapWarp(const Vec3<T>& curSrcCenter,
-                                               const Vec3<T>& curSrcSize,
-                                               const Vec3<T>& targetCenter,
-                                               const Vec3<T>& targetSize,
-                                               const Box<T>& box)
+template<bool UsePbc, class T, std::enable_if_t<!UsePbc, int> = 0>
+__device__ __forceinline__ bool minDistanceComp(T srcC, T srcS, T tarC, T tarS, T, T)
 {
-    int laneIdx   = threadIdx.x & (GpuConfig::warpSize - 1);
-    int component = laneIdx < 3 ? laneIdx : 0;
-    T srcCenter   = curSrcCenter[component];
-    T srcSize     = curSrcSize[component];
-    T tarCenter   = targetCenter[component];
-    T tarSize     = targetSize[component];
+    T dx = std::abs(tarC - srcC);
+    dx -= tarS;
+    dx -= srcS;
+    return dx <= T(0);
+}
 
-    T box_l  = box.lengths_[component];
-    T box_il = box.inverseLengths_[component];
-
-    bool overlapComponent = minDistanceComp(srcCenter, srcSize, tarCenter, tarSize, box_l, box_il);
-
-    //GpuConfig::ThreadMask overlap = ballotSync(overlapComponent);
-    //return (overlap & 7) == 7
-
-    bool lane1  = shflSync(overlapComponent, 1);
-    bool lane2  = shflSync(overlapComponent, 2);
-    bool result = overlapComponent && lane1 && lane2;
-    return shflSync(result, 0);
+template<bool UsePbc, class T>
+__device__ __forceinline__ bool cellOverlapWarp(
+    const T& srcCenter, const T& srcSize, const T& tarCenter, const T& tarSize, const T& box_l, const T& box_il)
+{
+    bool overlapComponent         = minDistanceComp<UsePbc>(srcCenter, srcSize, tarCenter, tarSize, box_l, box_il);
+    GpuConfig::ThreadMask overlap = ballotSync(overlapComponent);
+    return (overlap & 7) == 7;
 }
 
 template<bool UsePbc, class T, std::enable_if_t<UsePbc, int> = 0>
@@ -201,7 +191,6 @@ __device__ __forceinline__ bool cellOverlap(const Vec3<T>& curSrcCenter,
                                             const Box<T>& box)
 {
     return norm2(minDistance(curSrcCenter, curSrcSize, targetCenter, targetSize, box)) == T(0.0);
-    //return cellOverlapWarp(curSrcCenter, curSrcSize, targetCenter, targetSize, box);
 }
 
 template<bool UsePbc, class T, std::enable_if_t<!UsePbc, int> = 0>
@@ -251,8 +240,8 @@ __device__ uint2 traverseWarpDfs(unsigned* nc_i,
                                  unsigned* nidx_i,
                                  unsigned ngmax,
                                  const util::array<Vec4<Tc>, TravConfig::nwt>& pos_i,
-                                 const Vec3<Tc> targetCenter,
-                                 const Vec3<Tc> targetSize,
+                                 const Tc& targetCenter,
+                                 const Tc& targetSize,
                                  const Tc* __restrict__ x,
                                  const Tc* __restrict__ y,
                                  const Tc* __restrict__ z,
@@ -270,17 +259,21 @@ __device__ uint2 traverseWarpDfs(unsigned* nc_i,
     const Vec3<Tc>* __restrict__ centers             = tree.centers;
     const Vec3<Tc>* __restrict__ sizes               = tree.sizes;
 
-    const int laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
-
     unsigned p2pCounter = 0;
 
-    auto overlaps = [targetCenter, targetSize, centers, sizes, &box](TreeNodeIndex idx)
-    { return cellOverlap<UsePbc>(targetCenter, targetSize, centers[idx], sizes[idx], box); };
+    auto overlaps = [&targetCenter, &targetSize, centers, sizes, &box](TreeNodeIndex idx)
+    {
+        const int laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
+        int c             = laneIdx < 3 ? laneIdx : 0;
+        return cellOverlapWarp<UsePbc>(targetCenter, targetSize, centers[idx][c], sizes[idx][c], box.lengths_[c],
+                                       box.inverseLengths_[c]);
+    };
 
     int bodyQueue = 0, fillLevel = 0;
-    auto searchBox = [laneIdx, internalToLeaf, layout, x, y, z, &pos_i, &box, ngmax, nc_i, nidx_i, &p2pCounter,
+    auto searchBox = [internalToLeaf, layout, x, y, z, &pos_i, &box, ngmax, nc_i, nidx_i, &p2pCounter,
                       &bodyQueue, &fillLevel](TreeNodeIndex idx)
     {
+        const int laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
         if (idx == -1)
         {
             Vec3<Tc> sourceBody =
@@ -693,7 +686,10 @@ __device__ util::array<unsigned, TravConfig::nwt> traverseNeighbors(cstone::Loca
     int* cellQueue = globalPool + TravConfig::memPerWarp * ((blockIdx.x * numWarpsPerBlock) + warpIdx);
 
     util::array<Vec4<Tc>, TravConfig::nwt> pos_i = loadTarget(bodyBegin, bodyEnd, laneIdx, x, y, z, h);
-    auto [targetCenter, targetSize]              = warpBbox(pos_i);
+    auto [c_, s_]              = warpBbox(pos_i);
+    int component = laneIdx < 3 ? laneIdx : 0;
+    Tc targetCenter = c_[component];
+    Tc targetSize = s_[component];
     targetSize *= Tc(tree.searchExtFactor);
 
 #pragma unroll
@@ -705,7 +701,7 @@ __device__ util::array<unsigned, TravConfig::nwt> traverseNeighbors(cstone::Loca
 
     auto pbc    = BoundaryType::periodic;
     bool anyPbc = box.boundaryX() == pbc || box.boundaryY() == pbc || box.boundaryZ() == pbc;
-    bool usePbc = anyPbc && !insideBox(targetCenter, targetSize, box);
+    bool usePbc = anyPbc && !insideBox(c_, s_, box);
 
     util::array<unsigned, TravConfig::nwt> nc_i; // NOLINT
     nc_i = 0;
