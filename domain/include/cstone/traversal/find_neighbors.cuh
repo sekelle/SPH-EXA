@@ -148,6 +148,51 @@ __device__ void countNeighbors(const Tc* __restrict__ x,
     }
 }
 
+//! @brief Compute the shortest periodic distance dX = A - B between two points,
+template<class T>
+HOST_DEVICE_FUN T applyPbcComp(T dx, T box_l, T box_il)
+{
+    return dx - box_l * std::rint(dx * box_il);
+}
+
+template<class T>
+__device__ __forceinline__ bool minDistanceComp(T srcC, T srcS, T tarC, T tarS, T box_l, T box_il)
+{
+    T dx = tarC - srcC;
+    dx   = std::abs(applyPbcComp(dx, box_l, box_il));
+    dx -= tarS;
+    dx -= srcS;
+    return dx <= T(0);
+}
+
+template<class T>
+__device__ __forceinline__ bool cellOverlapWarp(const Vec3<T>& curSrcCenter,
+                                               const Vec3<T>& curSrcSize,
+                                               const Vec3<T>& targetCenter,
+                                               const Vec3<T>& targetSize,
+                                               const Box<T>& box)
+{
+    int laneIdx   = threadIdx.x & (GpuConfig::warpSize - 1);
+    int component = laneIdx < 3 ? laneIdx : 0;
+    T srcCenter   = curSrcCenter[component];
+    T srcSize     = curSrcSize[component];
+    T tarCenter   = targetCenter[component];
+    T tarSize     = targetSize[component];
+
+    T box_l  = box.lengths_[component];
+    T box_il = box.inverseLengths_[component];
+
+    bool overlapComponent = minDistanceComp(srcCenter, srcSize, tarCenter, tarSize, box_l, box_il);
+
+    //GpuConfig::ThreadMask overlap = ballotSync(overlapComponent);
+    //return (overlap & 7) == 7
+
+    bool lane1  = shflSync(overlapComponent, 1);
+    bool lane2  = shflSync(overlapComponent, 2);
+    bool result = overlapComponent && lane1 && lane2;
+    return shflSync(result, 0);
+}
+
 template<bool UsePbc, class T, std::enable_if_t<UsePbc, int> = 0>
 __device__ __forceinline__ bool cellOverlap(const Vec3<T>& curSrcCenter,
                                             const Vec3<T>& curSrcSize,
@@ -156,6 +201,7 @@ __device__ __forceinline__ bool cellOverlap(const Vec3<T>& curSrcCenter,
                                             const Box<T>& box)
 {
     return norm2(minDistance(curSrcCenter, curSrcSize, targetCenter, targetSize, box)) == T(0.0);
+    //return cellOverlapWarp(curSrcCenter, curSrcSize, targetCenter, targetSize, box);
 }
 
 template<bool UsePbc, class T, std::enable_if_t<!UsePbc, int> = 0>
@@ -256,17 +302,17 @@ __device__ uint2 traverseWarpDfs(unsigned* nc_i,
 
         if (fillLevel == GpuConfig::warpSize) // if queue spilled
         {
-            Vec3<Tc> sourceBody{x[bodyQueue], y[bodyQueue], z[bodyQueue]};
-            countNeighbors<UsePbc>(sourceBody, GpuConfig::warpSize, pos_i, box, bodyQueue, ngmax, nc_i, nidx_i);
+            //Vec3<Tc> sourceBody{x[bodyQueue], y[bodyQueue], z[bodyQueue]};
+            countNeighbors<UsePbc>(x,y,z, GpuConfig::warpSize, pos_i, box, bodyQueue, ngmax, nc_i, nidx_i);
             p2pCounter += GpuConfig::warpSize;
             fillLevel = 0;
         }
 
         while (lastBody - firstBody >= GpuConfig::warpSize)
         {
-            LocalIndex bodyIdx  = firstBody + laneIdx;
-            Vec3<Tc> sourceBody{x[bodyIdx], y[bodyIdx], z[bodyIdx]};
-            countNeighbors<UsePbc>(sourceBody, GpuConfig::warpSize, pos_i, box, bodyIdx, ngmax, nc_i, nidx_i);
+            LocalIndex bodyIdx = firstBody + laneIdx;
+            //Vec3<Tc> sourceBody{x[bodyIdx], y[bodyIdx], z[bodyIdx]};
+            countNeighbors<UsePbc>(x,y,z, GpuConfig::warpSize, pos_i, box, bodyIdx, ngmax, nc_i, nidx_i);
             p2pCounter += GpuConfig::warpSize;
             firstBody += GpuConfig::warpSize;
         }
@@ -671,12 +717,12 @@ __device__ util::array<unsigned, TravConfig::nwt> traverseNeighbors(cstone::Loca
     uint2 warpStats;
     if (usePbc)
     {
-        warpStats = traverseWarp<true>(nc_i.data(), warpNidx, ngmax, pos_i, targetCenter, targetSize, x, y, z, h, tree,
+        warpStats = traverseWarpDfs<true>(nc_i.data(), warpNidx, ngmax, pos_i, targetCenter, targetSize, x, y, z, h, tree,
                                        initNode, box, tempQueue, cellQueue);
     }
     else
     {
-        warpStats = traverseWarp<false>(nc_i.data(), warpNidx, ngmax, pos_i, targetCenter, targetSize, x, y, z, h, tree,
+        warpStats = traverseWarpDfs<false>(nc_i.data(), warpNidx, ngmax, pos_i, targetCenter, targetSize, x, y, z, h, tree,
                                         initNode, box, tempQueue, cellQueue);
     }
     unsigned numP2P   = warpStats.x;

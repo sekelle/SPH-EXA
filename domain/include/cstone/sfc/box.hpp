@@ -157,7 +157,7 @@ public:
                        boundaries[2]);
     }
 
-private:
+//private:
     HOST_DEVICE_FUN
     friend constexpr bool operator==(const Box<T>& a, const Box<T>& b)
     {
