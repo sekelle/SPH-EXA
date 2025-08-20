@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <mpi.h>
 #include <span>
 
@@ -58,8 +59,10 @@ unsigned updateOctreeGlobalGpu(std::span<const KeyType> keys,
                                OctreeData<KeyType, GpuTag>& tree,
                                DevKeyVec& d_csTree,
                                DevCountVec& d_countsBuf,
-                               bool expectOverflows)
+                               bool expectOverflows,
+                               std::span<float> timing = {})
 {
+    auto t0 = std::chrono::high_resolution_clock::now();
     auto newNumNodes =
         computeNodeOpsGpu(d_csTree.data(), nNodes(d_csTree), d_countsBuf.data(), bucketSize, tree.childOffsets.data());
     reallocate(tree.prefixes, newNumNodes + 1, 1.01);
@@ -78,6 +81,7 @@ unsigned updateOctreeGlobalGpu(std::span<const KeyType> keys,
                          true);
 
     syncGpu();
+    std::chrono::time_point<std::chrono::high_resolution_clock> t1, t2;
     if (expectOverflows)
     {
         MPI_Op limitSum;
@@ -85,9 +89,22 @@ unsigned updateOctreeGlobalGpu(std::span<const KeyType> keys,
         mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), limitSum, MPI_COMM_WORLD);
         MPI_Op_free(&limitSum);
     }
-    else { mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), MPI_SUM, MPI_COMM_WORLD); }
+    else
+    {
+        t1 = std::chrono::high_resolution_clock::now();
+        mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), MPI_SUM, MPI_COMM_WORLD);
+        t2 = std::chrono::high_resolution_clock::now();
+    }
     sequenceMax(d_counts.data(), d_counts.data() + d_counts.size(), d_countsRed.data(), d_counts.data());
     d_countsBuf.resize(numLeafNodes);
+    auto t3 = std::chrono::high_resolution_clock::now();
+
+    if (timing.size() >= 3)
+    {
+        timing[0] = std::chrono::duration<float>(t1 - t0).count(); // assign::globalUpdate
+        timing[1] = std::chrono::duration<float>(t2 - t1).count(); // assign::allreduce
+        timing[2] = std::chrono::duration<float>(t3 - t2).count(); // assign::seqDl
+    }
 
     if (converged) { return 0; }
 
@@ -103,11 +120,12 @@ unsigned updateOctreeGlobal(std::span<const KeyType> keys,
                             DevKeyVec& d_csTree,
                             std::vector<unsigned>& counts,
                             DevCountVec& d_counts,
-                            bool firstCall)
+                            bool firstCall,
+                            std::span<float> timing = {})
 {
     if constexpr (HaveGpu<Accelerator>{})
     {
-        return updateOctreeGlobalGpu(keys, bucketSize, tree, d_csTree, d_counts, firstCall);
+        return updateOctreeGlobalGpu(keys, bucketSize, tree, d_csTree, d_counts, firstCall, timing);
     }
     else { return updateOctreeGlobal(keys, bucketSize, tree, leaves, counts); }
 }

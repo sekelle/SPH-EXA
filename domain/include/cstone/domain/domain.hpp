@@ -258,7 +258,7 @@ public:
         {
             focusTree_.updateMacs(global_.assignment(), centerDriftTol_ / theta_, true);
             focusTree_.updateTree(global_.assignment(), global_.treeLeaves(), box(), std::get<0>(scratch));
-            pushTime("domain::updateTree");
+            pushTime("domain::updateTree+");
             focusTree_.updateCounts(keyView, global_.treeLeaves(), global_.nodeCounts(), std::get<0>(scratch));
             pushTime("domain::updateCounts");
             focusTree_.updateCenters(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(m), global_.octree(), std::get<0>(scratch),
@@ -395,7 +395,20 @@ public:
                 focusTree_.geoSizesAcc().data()};
     }
 
-    auto getTimeDeltas() const { return std::make_tuple(std::span(tsNames_), std::span(ts_)); }
+    auto getTimeDeltas()
+    {
+        {
+            auto [letNames, letTs] = focusTree_.getTimeDeltas();
+            std::copy(letNames.begin(), letNames.end(), std::back_inserter(tsNames_));
+            std::copy(letTs.begin(), letTs.end(), std::back_inserter(ts_));
+        }
+        {
+            auto [assignNames, assignTs] = global_.getTimeDeltas();
+            std::copy(assignNames.begin(), assignNames.end(), std::back_inserter(tsNames_));
+            std::copy(assignTs.begin(), assignTs.end(), std::back_inserter(ts_));
+        }
+        return std::make_tuple(std::span(tsNames_), std::span(ts_));
+    }
 
 private:
     //! @brief bounds initialization on first call, use all particles

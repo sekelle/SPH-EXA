@@ -170,6 +170,7 @@ public:
             timer.logStatistics("sumP2P", stats[0] / timer.getLastStepTime());
             timer.logStatistics("sumM2P", stats[2] / timer.getLastStepTime());
         }
+        timer.logStatistics(domain.getTimeDeltas());
     }
 
     void integrate(DomainType& domain, DataType& simData) override
