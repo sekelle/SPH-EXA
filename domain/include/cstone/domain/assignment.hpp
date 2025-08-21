@@ -116,7 +116,7 @@ public:
         sequence<gpu>(o1.start, numPart, reorderFunctor.getBuf(), growthRate_);
         sortByKey<gpu>(keyView, std::span{reorderFunctor.getMap() + o1.start, keyView.size()}, s0, s1, growthRate_);
         if constexpr (gpu) { syncGpu(); }
-        pushTime("assign::makeGlobalBox");
+        pushTime("assign::sfcSort");
 
         for (int i = 0; i < 5; ++i)
         {
@@ -124,7 +124,13 @@ public:
             uint64_t maxNodeCnt  = *std::max_element(nodeCounts_.begin(), nodeCounts_.end());
             if (maxNodeCnt < 4 * bucketSize_) { break; }
         }
+        std::vector<float> upt(3);
         pushTime("assign::updateOctreeGlobal");
+        std::copy(upt.begin(), upt.end(), std::back_inserter(ts_));
+        tsNames_.push_back("assign::globalUpdate");
+        tsNames_.push_back("assign::allreduce");
+        tsNames_.push_back("assign::seqDl");
+
         if (firstCall_)
         {
             firstCall_ = false;
