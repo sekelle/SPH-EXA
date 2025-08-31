@@ -501,6 +501,15 @@ public:
             syncGpu();
             auto t0 = std::chrono::high_resolution_clock::now();
             if (not accumulate) { fillGpu(rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0)); }
+
+            auto hflags = toHost(macsAcc_);
+            auto cnts   = toHost(countsAcc_);
+            TreeNodeIndex iidx = locateNode(01013lu, hostPrefixes_.data(), octreeAcc_.levelRange.data());
+            if (prevFocusStart == 245305760000000000lu)
+            {
+                std::cout << "index search " << iidx << " " << cnts[iidx] << " flag " << hflags[iidx] << std::endl;
+            }
+
             markMacsGpu(rawPtr(octreeAcc_.prefixes), rawPtr(octreeAcc_.childOffsets), rawPtr(octreeAcc_.parents),
                         rawPtr(centersAcc_), box_, rawPtr(leavesAcc_) + fAssignStart, fAssignEnd - fAssignStart, false,
                         rawPtr(macsAcc_));

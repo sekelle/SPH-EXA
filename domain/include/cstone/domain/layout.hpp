@@ -167,7 +167,12 @@ void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
         selectCopyGpu(focusLeafCounts.data() + idx.end(), focusLeafCounts.size() - idx.end(), layout.data() + idx.end(),
                       layout.data() + idx.end());
 
+        uint64_t sum64 = reduceGpu(layout.data(), layout.size() - 1, uint64_t(0));
         exclusiveScanGpu(layout.data(), layout.data() + layout.size(), layout.data(), LocalIndex{0});
+
+        LocalIndex checksum = 0;
+        memcpyD2H(layout.data() + layout.size() - 1, 1, &checksum);
+        if (checksum != sum64) { std::cout << "layout sum is " << checksum << ", 64 bit sum is " << sum64 << std::endl; }
     }
     else
     {
