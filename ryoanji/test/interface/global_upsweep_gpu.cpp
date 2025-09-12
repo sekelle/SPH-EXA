@@ -20,7 +20,9 @@
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/domain/domain.hpp"
 #include "cstone/findneighbors.hpp"
+#include "cstone/tree/csarray.hpp"
 #include "coord_samples/random.hpp"
+
 
 #include "ryoanji/interface/global_multipole.hpp"
 #include "ryoanji/interface/multipole_holder.cuh"
@@ -78,37 +80,75 @@ static int multipoleHolderTest(int thisRank, int numRanks)
                             domain.layout().data());
 
     // Check the root multipole of the distributed tree
-    bool passMultipole = false;
+    std::array<int, 2> testResults{0, 0};
     {
+        // globally replicated tree built from reference particle set with full LET resolution everywhere
+        auto [refLeaves, refCounts] = cstone::computeOctree<KeyType>(coords.particleKeys(), bucketSizeLocal);
+        cstone::OctreeData<KeyType, cstone::CpuTag> refOctree;
+        refOctree.resize(cstone::nNodes(refLeaves));
+        cstone::updateInternalTree<KeyType>(refLeaves, refOctree.data());
+
+        std::vector<LocalIndex> refLayout(refOctree.numLeafNodes + 1);
+        std::inclusive_scan(refCounts.begin(), refCounts.end(), refLayout.begin() + 1);
+
+        std::vector<cstone::SourceCenterType<T>> refCenters(refOctree.numNodes);
+
+#pragma omp parallel for schedule(static)
+        for (TreeNodeIndex leafIdx = 0; leafIdx < refOctree.numLeafNodes; ++leafIdx)
+        {
+            TreeNodeIndex nodeIdx = refOctree.leafToInternal[refOctree.numInternalNodes + leafIdx];
+            refCenters[nodeIdx] =
+                cstone::massCenter<T>(coords.x().data(), coords.y().data(), coords.z().data(), globalMasses.data(),
+                                      refLayout[leafIdx], refLayout[leafIdx + 1]);
+        }
+        cstone::upsweep(refOctree.levelRange, refOctree.childOffsets.data(), refCenters.data(),
+                        cstone::CombineSourceCenter<T>{});
+        cstone::setMac<T, KeyType>(refOctree.prefixes, refCenters, 1.0 / theta, box);
+
         std::vector<MultipoleType> multipoles(octree.numNodes);
         memcpyD2H(multipoleHolder.deviceMultipoles(), multipoles.size(), multipoles.data());
-
-        MultipoleType globalRootMultipole = multipoles[0];
 
         auto                                     d_centers = focusTree.expansionCentersAcc();
         std::vector<cstone::SourceCenterType<T>> centers(d_centers.size());
         memcpyD2H(d_centers.data(), d_centers.size(), centers.data());
+
+        std::vector<KeyType> letKeys(octree.numNodes);
+        memcpyD2H(octree.prefixes, octree.numNodes, letKeys.data());
+
+        int numCentersFail = 0;
+        for (TreeNodeIndex i = 0; i < octree.numNodes; ++i)
+        {
+            auto refIdx = cstone::locateNode(letKeys[i], refOctree.prefixes.data(), refOctree.levelRange.data());
+            for (std::size_t c = 0; c < centers[i].size(); ++c)
+            {
+                if (std::abs(centers[i][c] - refCenters[refIdx][c]) > 1e-6) { numCentersFail++; }
+            }
+        }
 
         // compute reference root cell multipole from global particle data
         MultipoleType reference;
         P2M(coords.x().data(), coords.y().data(), coords.z().data(), globalMasses.data(), 0, numParticles * numRanks,
             centers[0], reference);
 
+        MultipoleType globalRootMultipole = multipoles[0];
         double maxDiff = max(abs(reference - globalRootMultipole));
 
         bool pass      = maxDiff < 1e-10;
-        int  numPassed = pass;
-        mpiAllreduce(MPI_IN_PLACE, &numPassed, 1, MPI_SUM, MPI_COMM_WORLD);
-        if (numPassed == numRanks) { passMultipole = true; }
+        testResults[0] = pass;
+        testResults[1] = numCentersFail == 0;
+        mpiAllreduce(MPI_IN_PLACE, testResults.data(), testResults.size(), MPI_SUM, MPI_COMM_WORLD);
     }
 
+    bool testPassed = testResults[0] == numRanks && testResults[1] == numRanks;
     if (thisRank == 0)
     {
-        std::string testResult = passMultipole ? "PASS" : "FAIL";
-        std::cout << "Upsweep test result: " << testResult << std::endl;
+        std::string r1 = testResults[0] == numRanks ? "PASS" : "FAIL";
+        std::cout << "Upsweep test result: " << r1 << std::endl;
+        std::string r2 = testResults[1] == numRanks ? "PASS" : "FAIL";
+        std::cout << "Center-of-mass test result: " << r1 << std::endl;
     }
 
-    if (passMultipole) { return EXIT_SUCCESS; }
+    if (testPassed) { return EXIT_SUCCESS; }
     else { return EXIT_FAILURE; }
 }
 
