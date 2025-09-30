@@ -110,8 +110,8 @@ public:
         }
 
         std::vector<KeyType> enforcedKeys{focusStart, focusEnd};
-        focusTransfer<KeyType, useGpu>(leaves_, {leafCountsAcc_.data(), leafCountsAcc_.size()}, bucketSize_, myRank_,
-                                       prevFocusStart, prevFocusEnd, focusStart, focusEnd, enforcedKeys);
+        //focusTransfer<KeyType, useGpu>(leaves_, {leafCountsAcc_.data(), leafCountsAcc_.size()}, bucketSize_, myRank_,
+        //                               prevFocusStart, prevFocusEnd, focusStart, focusEnd, enforcedKeys);
         std::span gLeavesRank = globalLeaves.subspan(assignment.treeOffsetsConst()[myRank_],
                                                      assignment.numNodesPerRankConst()[myRank_] + 1);
         float invThetaRefine  = sqrt(3) / 2 + 1e-6; // half the cube-diagonal + eps for a min-like MAC with geo centers
@@ -128,9 +128,9 @@ public:
                 octreeAcc_, leavesAcc_, bucketSize_, focusStart, focusEnd, enforcedKeysAcc,
                 {rawPtr(countsAcc_), countsAcc_.size()}, {rawPtr(macsAcc_), macsAcc_.size()}, scratch);
 
-            while (not macRefineGpu(octreeAcc_, leavesAcc_, centersAcc_, macsAcc_, prevFocusStart, prevFocusEnd,
-                                    focusStart, focusEnd, invThetaRefine, box))
-                ;
+            //while (not macRefineGpu(octreeAcc_, leavesAcc_, centersAcc_, macsAcc_, prevFocusStart, prevFocusEnd,
+            //                        focusStart, focusEnd, invThetaRefine, box))
+            //    ;
 
             reallocateDestructive(leaves_, leavesAcc_.size(), allocGrowthRate_);
             memcpyD2H(rawPtr(leavesAcc_), leavesAcc_.size(), rawPtr(leaves_));
