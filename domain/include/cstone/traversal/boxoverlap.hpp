@@ -278,19 +278,15 @@ HOST_DEVICE_FUN Vec3<T> minDistance(
 
 //! @brief returns true if the two cuboids a and b overlap
 template<class T>
-HOST_DEVICE_FUN int
+HOST_DEVICE_FUN bool
 overlap(const Vec3<T>& aCenter, const Vec3<T>& aSize, const Vec3<T>& bCenter, const Vec3<T>& bSize, const Box<T>& box)
 {
-    constexpr T eps = 0;
-
     Vec3<T> dX = bCenter - aCenter;
     dX         = abs(applyPbc(dX, box));
-    dX += aSize;
+    dX -= aSize;
     dX -= bSize;
-    // a is fully contained in b
-    if (dX[0] < eps && dX[1] < eps && dX[2] < eps) { return 2; }
 
-    dX -= aSize * T(2);
+    constexpr T eps = 0;
     return dX[0] < eps && dX[1] < eps && dX[2] < eps;
 }
 

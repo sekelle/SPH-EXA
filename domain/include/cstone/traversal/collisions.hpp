@@ -35,25 +35,13 @@ HOST_DEVICE_FUN void findCollisions(const KeyType* nodePrefixes,
                                     KeyType excludeEnd,
                                     uint8_t* flags)
 {
-    bool passThrough = false;
-    auto overlaps    = [&](TreeNodeIndex idx)
+    auto overlaps = [&](TreeNodeIndex idx)
     {
-        // another target already set flags of idx including all children to true
-        if (flags[idx] == 2) { return 0; }
-
-        if (passThrough)
-        {
-            flags[idx] = 1;
-            return 1;
-        }
-
         auto [nk1, nk2] = decodePlaceholderBit2K(nodePrefixes[idx]);
-        int excluded    = containedIn(nk1, nk2, excludeStart, excludeEnd);
-        int overlaps    = 0;
-        if (!excluded) overlaps = overlap(nodeCenters[idx], nodeSizes[idx], targetCenter, targetSize, box);
-        if (overlaps) { flags[idx] = overlaps; }
-        if (overlaps == 2) { passThrough = true; }
-        return overlaps;
+        bool bOverlap   = !containedIn(nk1, nk2, excludeStart, excludeEnd) &&
+                        overlap(nodeCenters[idx], nodeSizes[idx], targetCenter, targetSize, box);
+        if (bOverlap) { flags[idx] = 1; }
+        return bOverlap;
     };
 
     singleTraversal(childOffsets, parents, overlaps, [](TreeNodeIndex) {});
