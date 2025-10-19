@@ -567,13 +567,76 @@ public:
             fillGpu(layout.data() + firstNode, layout.data() + firstNode + 1, LocalIndex{0});
             inclusiveScanGpu(leafCountsAcc_.data() + firstNode, leafCountsAcc_.data() + lastNode,
                              layout.data() + firstNode + 1);
+
+            gatherAcc<useGpu>(let.leafToInternalSpan(), geoSizesAcc_.data(), searchSizes.data());
+            std::vector<Vec3<RealType>> hgeos(numLeafNodes);
+            memcpyD2H(searchSizes.data(), numLeafNodes, hgeos.data());
+
             computeBoundingBoxGpu(x, y, z, h, layout.data(), firstNode, lastNode, Th(2 * searchExtFact),
                                   searchCenters.data(), searchSizes.data());
 
+            std::vector<Vec3<RealType>> hsc(numLeafNodes), hss(numLeafNodes);
+            memcpyD2H(searchCenters.data(), numLeafNodes, hsc.data());
+            memcpyD2H(searchSizes.data(), numLeafNodes, hss.data());
+
+            std::vector<int> numSplits(numNodesSearch + 1);
+#pragma omp parallel for schedule(static)
+            for (std::size_t i = firstNode; i < lastNode; ++i)
+            {
+                auto vSearch = hss[i][0] * hss[i][1] * hss[i][2];
+                auto vNode   = hgeos[i][0] * hgeos[i][1] * hgeos[i][2];
+
+                numSplits[i - firstNode] = 1;
+                if (vSearch > 8 * vNode) numSplits[i - firstNode] = 8;
+                if (vSearch > 64 * vNode) numSplits[i - firstNode] = 64;
+                if (vSearch > 512 * vNode) numSplits[i - firstNode] = 512;
+            }
+            std::exclusive_scan(numSplits.begin(), numSplits.end(), numSplits.begin(), 0);
+
+            std::size_t newNumSearches = numSplits.back();
+            std::vector<Vec3<RealType>> newSc(newNumSearches), newSs(newNumSearches);
+
+            //if (newNumSearches > lastNode) std::cout << "new " << newNumSearches << " old " << numNodesSearch << std::endl;
+
+#pragma omp parallel for
+            for (std::size_t i = 0; i < numNodesSearch; ++i)
+            {
+                unsigned oldIdx     = i + firstNode;
+                unsigned newIdx     = numSplits[i];
+                unsigned splitCount = numSplits[i + 1] - numSplits[i];
+
+                if (splitCount == 1) { std::tie(newSc[newIdx], newSs[newIdx]) = std::tie(hsc[oldIdx], hss[oldIdx]); }
+                else
+                {
+                    int splitsPerSide = 1 << log8ceil(splitCount);
+                    int displ         = splitsPerSide - 1;
+
+                    auto newSize = hss[oldIdx] * (RealType(1) / splitsPerSide);
+
+                    int ni = 0;
+                    for (int a = -displ; a <= displ; a += 2)
+                        for (int b = -displ; b <= displ; b += 2)
+                            for (int c = -displ; c <= displ; c += 2)
+                            {
+                                auto newCenter =
+                                    Vec3<RealType>{a * newSize[0], b * newSize[1], c * newSize[2]} + hsc[oldIdx];
+                                assert(newIdx + ni < newNumSearches);
+                                newSc[newIdx + ni] = newCenter;
+                                newSs[newIdx + ni] = newSize;
+                                ni++;
+                            }
+                }
+            }
+
+            auto [searchCenters, searchSizes] = util::packAllocBuffer(
+                scratch, util::TypeList<Vec3<RealType>, Vec3<RealType>>{}, {newNumSearches, newNumSearches}, 128);
+            memcpyH2D(newSc.data(), newSc.size(), searchCenters.data());
+            memcpyH2D(newSs.data(), newSs.size(), searchSizes.data());
+
             if (not accumulate) { fillGpu(rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0)); }
             findHalosGpu(let.prefixes, let.childOffsets, let.parents, geoCentersAcc_.data(), geoSizesAcc_.data(),
-                         leavesAcc_.data(), searchCenters.data(), searchSizes.data(), box_, firstNode, lastNode,
-                         macsAcc_.data());
+                         leavesAcc_.data(), searchCenters.data(), searchSizes.data(), newNumSearches, box_, firstNode,
+                         lastNode, macsAcc_.data());
         }
         else
         {
