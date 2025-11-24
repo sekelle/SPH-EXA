@@ -76,13 +76,13 @@ __global__ void cudaGradP(Tc K, Tc Kcour, unsigned ngmax, cstone::Box<Tc> box, c
         LocalIndex bodyEnd   = grpEnd[targetIdx];
         LocalIndex i         = bodyBegin + laneIdx;
 
-        auto ncTrue = traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool);
-
         if (i >= bodyEnd) continue;
+        unsigned ncTrue =
+            findNeighbors(i, x, y, z, h, tree, box, ngmax, neighborsWarp + laneIdx, TravConfig::targetSize);
 
-        if (ncTrue[0] >= 25 && ncTrue[0] <= ngmax)
+        if (ncTrue >= 25 && ncTrue <= ngmax)
         {
-            unsigned ncCapped = stl::min(ncTrue[0], ngmax);
+            unsigned ncCapped = stl::min(ncTrue, ngmax);
             T        maxvsignal;
 
             momentumAndEnergyJLoop<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncCapped, x, y, z, vx,

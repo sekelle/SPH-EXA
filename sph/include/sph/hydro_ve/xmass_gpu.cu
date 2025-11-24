@@ -55,7 +55,7 @@ template<class Tc, class Tm, class T, class KeyType>
 __global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<Tc> box, const LocalIndex* grpStart,
                          const LocalIndex* grpEnd, LocalIndex numGroups, const cstone::OctreeNsView<Tc, KeyType> tree,
                          unsigned* nc, const Tc* x, const Tc* y, const Tc* z, T* h, const Tm* m, const T* wh,
-                         const T* whd, T* xm, LocalIndex* nidx, TreeNodeIndex* globalPool)
+                         const T* whd, T* xm, LocalIndex* nidx, TreeNodeIndex* /*globalPool*/)
 {
     unsigned laneIdx     = threadIdx.x & (GpuConfig::warpSize - 1);
     unsigned targetIdx   = 0;
@@ -75,23 +75,22 @@ __global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<T
         LocalIndex bodyEnd   = grpEnd[targetIdx];
         LocalIndex i         = bodyBegin + laneIdx;
 
+        if (i >= bodyEnd) continue;
+
         unsigned ncSph =
-            1 + traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool)[0];
+            1 + findNeighbors(i, x, y, z, h, tree, box, ngmax, neighborsWarp + laneIdx, TravConfig::targetSize);
 
         constexpr int ncMaxIteration = 9;
         for (int ncIt = 0; ncIt <= ncMaxIteration; ++ncIt)
         {
-            bool repeat = (ncSph < ng0 / 4 || (ncSph - 1) > ngmax) && i < bodyEnd;
-            if (!cstone::ballotSync(repeat)) { break; }
-            if (repeat) { h[i] = updateH(ng0, ncSph, h[i]); }
-            ncSph =
-                1 + traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool)[0];
+            bool repeat = (ncSph < ng0 / 4 || (ncSph - 1) > ngmax);
+            if (!repeat) { break; }
+            h[i]  = updateH(ng0, ncSph, h[i]);
+            ncSph = 1 + findNeighbors(i, x, y, z, h, tree, box, ngmax, neighborsWarp + laneIdx, TravConfig::targetSize);
 
             bool ncFail = (ncSph < ng0 / 4 || (ncSph - 1) > ngmax) && i < bodyEnd;
             if (ncIt == ncMaxIteration && ncFail) { ncSph = 1; }
         }
-
-        if (i >= bodyEnd) continue;
 
         unsigned ncCapped = stl::min(ncSph - 1, ngmax);
         xm[i] = sph::xmassJLoop<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncCapped, x, y, z, h, m, wh,

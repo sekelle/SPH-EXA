@@ -55,8 +55,6 @@ using cstone::TreeNodeIndex;
  * @param[in]  grpStart        start of each particle group, length @p numGroups
  * @param[in]  grpEnd          end of each particle groups, length @p numGroups
  * @param[in]  numGroups       number of groups
- * @param[in]  numParticles    number of local particles + halos
- * @param[in]  particleKeys    SFC keys of particles, sorted in ascending order
  * @param[in]  x               x coords, length @p numParticles, SFC sorted
  * @param[in]  y               y coords, length @p numParticles, SFC sorted
  * @param[in]  z               z coords, length @p numParticles, SFC sorted
@@ -77,7 +75,7 @@ __global__ void IADGpuKernel(Tc K, unsigned ngmax, cstone::Box<Tc> box, const Lo
                              const LocalIndex* grpEnd, LocalIndex numGroups,
                              const cstone::OctreeNsView<Tc, KeyType> tree, const Tc* x, const Tc* y, const Tc* z,
                              const T* h, const Tm* m, const T* rho, const T* wh, const T* whd, T* c11, T* c12, T* c13,
-                             T* c22, T* c23, T* c33, LocalIndex* nidx, TreeNodeIndex* globalPool)
+                             T* c22, T* c23, T* c33, LocalIndex* nidx, TreeNodeIndex* /*globalPool*/)
 {
     unsigned laneIdx     = threadIdx.x & (GpuConfig::warpSize - 1);
     unsigned targetIdx   = 0;
@@ -97,14 +95,16 @@ __global__ void IADGpuKernel(Tc K, unsigned ngmax, cstone::Box<Tc> box, const Lo
         LocalIndex bodyEnd   = grpEnd[targetIdx];
         LocalIndex i         = bodyBegin + laneIdx;
 
-        auto ncTrue = traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool);
+        if (i >= bodyEnd) continue;
+        unsigned ncTrue =
+            findNeighbors(i, x, y, z, h, tree, box, ngmax, neighborsWarp + laneIdx, TravConfig::targetSize);
 
         if (i >= bodyEnd) { continue; }
 
-        if (ncTrue[0] < 25 || ncTrue[0] > ngmax) { c11[i] = c12[i] = c13[i] = c22[i] = c23[i] = c33[i] = 0.; }
+        if (ncTrue < 25 || ncTrue > ngmax) { c11[i] = c12[i] = c13[i] = c22[i] = c23[i] = c33[i] = 0.; }
         else
         {
-            unsigned ncCapped = stl::min(ncTrue[0], ngmax);
+            unsigned ncCapped = stl::min(ncTrue, ngmax);
             sph::IADJLoopSTD<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncCapped, x, y, z, h, m, rho,
                                                      wh, whd, c11, c12, c13, c22, c23, c33);
         }
