@@ -25,6 +25,12 @@ struct MomentumAndEnergyInteractionStd
         const auto [i, iPos, hi, mi, roi, vxi, vyi, vzi, pri, ci, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
         const auto [j, jPos, hj, mj, roj, vxj, vyj, vzj, prj, cj, c11j, c12j, c13j, c22j, c23j, c33j] = jData;
 
+        if (hj == 0)
+        {
+            return std::make_tuple(Tm1{}, T{}, T{}, T{},
+                                   cstone::ijloop::symmetric::even(cstone::ijloop::reduction::max(T{})));
+        }
+
         T rx = r_ij[0];
         T ry = r_ij[1];
         T rz = r_ij[2];

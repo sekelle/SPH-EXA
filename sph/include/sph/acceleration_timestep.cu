@@ -17,7 +17,8 @@ struct AccelerationTimestep
 {
     __device__ T operator()(const thrust::tuple<T, T, T, T>& a_h)
     {
-        const T               h_i = thrust::get<3>(a_h);
+        const T h_i = thrust::get<3>(a_h);
+        if (h_i == 0) { return INFINITY; }
         const cstone::Vec3<T> A{thrust::get<0>(a_h), thrust::get<1>(a_h), thrust::get<2>(a_h)};
         return h_i * h_i / norm2(A);
     }
