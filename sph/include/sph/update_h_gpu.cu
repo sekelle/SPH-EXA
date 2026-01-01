@@ -106,17 +106,18 @@ updateSmoothingLengthIterativeGpuKernel(unsigned ng0, unsigned ngmax, const csto
         LocalIndex bodyEnd   = grpEnd[targetIdx];
         LocalIndex i         = bodyBegin + laneIdx;
 
+        if (i >= bodyEnd) continue;
+
         unsigned ncSph =
-            1 + traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool)[0];
+            1 + findNeighbors(i, x, y, z, h, tree, box, ngmax, neighborsWarp + laneIdx, TravConfig::targetSize);
 
         constexpr int ncMaxIteration = 9;
         for (int ncIt = 0; ncIt <= ncMaxIteration; ++ncIt)
         {
-            bool repeat = (ncSph < ng0 / 4 || (ncSph - 1) > ngmax) && i < bodyEnd;
-            if (!cstone::ballotSync(repeat)) { break; }
-            if (repeat) { h[i] = updateH(ng0, ncSph, h[i]); }
-            ncSph =
-                1 + traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool)[0];
+            bool repeat = (ncSph < ng0 / 4 || (ncSph - 1) > ngmax);
+            if (!repeat) { break; }
+            h[i]  = updateH(ng0, ncSph, h[i]);
+            ncSph = 1 + findNeighbors(i, x, y, z, h, tree, box, ngmax, neighborsWarp + laneIdx, TravConfig::targetSize);
 
             bool ncFail = (ncSph < ng0 / 4 || (ncSph - 1) > ngmax) && i < bodyEnd;
             if (ncIt == ncMaxIteration && ncFail)
@@ -125,8 +126,6 @@ updateSmoothingLengthIterativeGpuKernel(unsigned ng0, unsigned ngmax, const csto
                 ncSph = 1;
             }
         }
-
-        if (i >= bodyEnd) continue;
 
         nc[i] = ncSph;
     }
