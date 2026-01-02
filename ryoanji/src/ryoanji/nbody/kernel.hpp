@@ -52,6 +52,7 @@ template<class Ta, class Tc, class Th, class Tm>
 HOST_DEVICE_FUN DEVICE_INLINE Vec4<Ta> P2P(Vec4<Ta> acc, const Vec3<Tc>& pos_i, const Vec3<Tc>& pos_j, Tm m_j, Th h_i,
                                            Th h_j)
 {
+    if (h_i == 0 or h_j == 0) return acc;
     Vec3<Tc> dX = pos_j - pos_i;
     Tc       R2 = norm2(dX);
 
