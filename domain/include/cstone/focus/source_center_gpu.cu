@@ -20,6 +20,7 @@
 #include "cstone/cuda/cub.hpp"
 
 #include "cstone/primitives/math.hpp"
+#include "cstone/primitives/warpscan.cuh"
 #include "source_center.hpp"
 #include "source_center_gpu.h"
 
@@ -73,7 +74,7 @@ COMPUTE_BOUNDING_BOX_GPU(double, double);
 COMPUTE_BOUNDING_BOX_GPU(double, float);
 COMPUTE_BOUNDING_BOX_GPU(float, float);
 
-template<class Tc, class Tm, class Tf>
+template<int TPL, class Tc, class Tm, class Tf>
 __global__ void computeLeafSourceCenterKernel(const Tc* x,
                                               const Tc* y,
                                               const Tc* z,
@@ -83,11 +84,35 @@ __global__ void computeLeafSourceCenterKernel(const Tc* x,
                                               const LocalIndex* layout,
                                               Vec4<Tf>* centers)
 {
-    TreeNodeIndex leafIdx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (leafIdx >= numLeaves) { return; }
+    TreeNodeIndex tid     = blockIdx.x * blockDim.x + threadIdx.x;
+    TreeNodeIndex leafIdx = tid / TPL;
 
-    TreeNodeIndex nodeIdx = leafToInternal[leafIdx];
-    centers[nodeIdx]      = massCenter<Tf>(x, y, z, m, layout[leafIdx], layout[leafIdx + 1]);
+    Vec4<Tf> mc_loc{0, 0, 0, 0};
+    if (leafIdx < numLeaves)
+    {
+        auto first = layout[leafIdx];
+        auto last  = layout[leafIdx + 1];
+
+        for (LocalIndex i = first + threadIdx.x % TPL; i < last; i += TPL)
+        {
+            addBody(mc_loc, {x[i], y[i], z[i], m[i]});
+        }
+    }
+
+#pragma unroll
+    for (int offset = 1; offset < TPL; offset *= 2)
+    {
+        mc_loc[0] += shflDownSync(mc_loc[0], offset);
+        mc_loc[1] += shflDownSync(mc_loc[1], offset);
+        mc_loc[2] += shflDownSync(mc_loc[2], offset);
+        mc_loc[3] += shflDownSync(mc_loc[3], offset);
+    }
+
+    if (tid % TPL == 0 && leafIdx < numLeaves)
+    {
+        TreeNodeIndex nodeIdx = leafToInternal[leafIdx];
+        centers[nodeIdx]      = normalizeMass(mc_loc);
+    }
 }
 
 template<class Tc, class Tm, class Tf>
@@ -100,11 +125,13 @@ void computeLeafSourceCenterGpu(const Tc* x,
                                 const LocalIndex* layout,
                                 Vec4<Tf>* centers)
 {
+    constexpr int tpl   = 4;
     unsigned numThreads = 256;
-    unsigned numBlocks  = iceil(numLeaves, numThreads);
+    unsigned numBlocks  = iceil(tpl * numLeaves, numThreads);
 
     if (numBlocks == 0) { return; }
-    computeLeafSourceCenterKernel<<<numBlocks, numThreads>>>(x, y, z, m, leafToInternal, numLeaves, layout, centers);
+    computeLeafSourceCenterKernel<tpl>
+        <<<numBlocks, numThreads>>>(x, y, z, m, leafToInternal, numLeaves, layout, centers);
 }
 
 #define COMPUTE_LEAF_SOURCE_CENTER_GPU(Tc, Tm, Tf)                                                                     \
