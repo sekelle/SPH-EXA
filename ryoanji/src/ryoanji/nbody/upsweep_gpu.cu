@@ -15,6 +15,7 @@
 
 #include "cstone/cuda/cuda_runtime.hpp"
 #include "cstone/primitives/math.hpp"
+#include "cstone/primitives/warpscan.cuh"
 
 #include "ryoanji/nbody/cartesian_qpole.hpp"
 #include "ryoanji/nbody/kernel.hpp"
@@ -29,17 +30,34 @@ struct UpsweepConfig
     static constexpr int numThreads = 256;
 };
 
-template<class Tc, class Tm, class Tf, class MType>
+template<int TPL, class Tc, class Tm, class Tf, class MType>
 __global__ void computeLeafMultipolesKernel(const Tc* x, const Tc* y, const Tc* z, const Tm* m,
                                             const TreeNodeIndex* leafToInternal, TreeNodeIndex numLeaves,
                                             const LocalIndex* layout, const Vec4<Tf>* centers, MType* multipoles)
 {
-    unsigned leafIdx = blockIdx.x * blockDim.x + threadIdx.x;
+    TreeNodeIndex tid     = blockIdx.x * blockDim.x + threadIdx.x;
+    TreeNodeIndex leafIdx = tid / TPL;
+    TreeNodeIndex internalIdx;
+
+    MType mp_loc;
+    mp_loc = 0;
     if (leafIdx < numLeaves)
     {
-        TreeNodeIndex i = leafToInternal[leafIdx];
-        P2M(x, y, z, m, layout[leafIdx], layout[leafIdx + 1], centers[i], multipoles[i]);
+        internalIdx = leafToInternal[leafIdx];
+        auto com    = centers[internalIdx];
+        P2M_add<TPL>(x, y, z, m, layout[leafIdx] + threadIdx.x % TPL, layout[leafIdx + 1], com, mp_loc);
     }
+
+#pragma unroll
+    for (int offset = 1; offset < TPL; offset *= 2)
+    {
+        constexpr int mpNumElements = mp_loc.size();
+#pragma unroll
+        for (int mi = 0; mi < mpNumElements; ++mi)
+            mp_loc[mi] += cstone::shflDownSync(mp_loc[mi], offset);
+    }
+
+    if (tid % TPL == 0 && leafIdx < numLeaves) { multipoles[internalIdx] = P2M_finalize(mp_loc); }
 }
 
 template<class Tc, class Tm, class Tf, class MType>
@@ -48,10 +66,13 @@ void computeLeafMultipoles(const Tc* x, const Tc* y, const Tc* z, const Tm* m, c
                            MType* multipoles)
 {
     constexpr int numThreads = UpsweepConfig::numThreads;
-    if (numLeaves)
+    constexpr int threadsPerLeaf = 8;
+    int numBlocks = cstone::iceil(threadsPerLeaf * numLeaves, numThreads);
+
+    if (numBlocks)
     {
-        computeLeafMultipolesKernel<<<cstone::iceil(numLeaves, numThreads), numThreads>>>(
-            x, y, z, m, leafToInternal, numLeaves, layout, centers, multipoles);
+        computeLeafMultipolesKernel<threadsPerLeaf>
+            <<<numBlocks, numThreads>>>(x, y, z, m, leafToInternal, numLeaves, layout, centers, multipoles);
     }
 }
 

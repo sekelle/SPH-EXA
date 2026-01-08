@@ -125,12 +125,12 @@ void computeLeafSourceCenterGpu(const Tc* x,
                                 const LocalIndex* layout,
                                 Vec4<Tf>* centers)
 {
-    constexpr int tpl   = 4;
-    unsigned numThreads = 256;
-    unsigned numBlocks  = iceil(tpl * numLeaves, numThreads);
+    constexpr int threadsPerLeaf = 8;
+    unsigned numThreads          = 256;
+    unsigned numBlocks           = iceil(threadsPerLeaf * numLeaves, numThreads);
 
     if (numBlocks == 0) { return; }
-    computeLeafSourceCenterKernel<tpl>
+    computeLeafSourceCenterKernel<threadsPerLeaf>
         <<<numBlocks, numThreads>>>(x, y, z, m, leafToInternal, numLeaves, layout, centers);
 }
 
