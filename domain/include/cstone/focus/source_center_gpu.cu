@@ -13,13 +13,18 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
+#include <thrust/device_vector.h>
+#include <thrust/iterator/transform_iterator.h>
+#include <thrust/iterator/transform_output_iterator.h>
+#include <thrust/iterator/permutation_iterator.h>
+#include "cstone/cuda/cub.hpp"
+
 #include "cstone/primitives/math.hpp"
 #include "source_center.hpp"
 #include "source_center_gpu.h"
 
 namespace cstone
 {
-
 template<class Tc, class Th>
 __global__ void computeBoundingBoxKernel(const Tc* x,
                                          const Tc* y,
@@ -60,9 +65,9 @@ void computeBoundingBoxGpu(const Tc* x,
 }
 
 #define COMPUTE_BOUNDING_BOX_GPU(Tc, Th)                                                                               \
-    template void computeBoundingBoxGpu(const Tc* x, const Tc* y, const Tc* z, const Th* h, const LocalIndex* layout,  \
-                                        TreeNodeIndex first, TreeNodeIndex last, Th scale, Vec3<Tc>* searchCenters,    \
-                                        Vec3<Tc>* searchSizes);
+template void computeBoundingBoxGpu(const Tc* x, const Tc* y, const Tc* z, const Th* h, const LocalIndex* layout,  \
+TreeNodeIndex first, TreeNodeIndex last, Th scale, Vec3<Tc>* searchCenters,    \
+Vec3<Tc>* searchSizes);
 
 COMPUTE_BOUNDING_BOX_GPU(double, double);
 COMPUTE_BOUNDING_BOX_GPU(double, float);
@@ -103,12 +108,69 @@ void computeLeafSourceCenterGpu(const Tc* x,
 }
 
 #define COMPUTE_LEAF_SOURCE_CENTER_GPU(Tc, Tm, Tf)                                                                     \
-    template void computeLeafSourceCenterGpu(const Tc*, const Tc*, const Tc*, const Tm*, const TreeNodeIndex*,         \
-                                             TreeNodeIndex, const LocalIndex*, Vec4<Tf>*);
+template void computeLeafSourceCenterGpu(const Tc*, const Tc*, const Tc*, const Tm*, const TreeNodeIndex*,         \
+TreeNodeIndex, const LocalIndex*, Vec4<Tf>*);
 
 COMPUTE_LEAF_SOURCE_CENTER_GPU(double, double, double);
 COMPUTE_LEAF_SOURCE_CENTER_GPU(double, float, double);
 COMPUTE_LEAF_SOURCE_CENTER_GPU(float, float, float);
+
+template<class Tc, class Tm, class Tf>
+struct BodyToSourceCenter
+{
+    HOST_DEVICE_FUN
+    SourceCenterType<Tf> operator()(const thrust::tuple<Tc, Tc, Tc, Tm>& p)
+    {
+        auto m = get<3>(p);
+        return {get<0>(p) * m, get<1>(p) * m, get<2>(p) * m, m};
+    }
+};
+
+template<class T>
+struct NormMass
+{
+    HOST_DEVICE_FUN SourceCenterType<T> operator()(const SourceCenterType<T>& p)
+    {
+        T invM = p[3] != T(0.0) ? T(1) / p[3] : T(1);
+        return Vec4<T>{p[0] * invM, p[1] * invM, p[2] * invM, p[3]};
+    }
+};
+
+template<class Tc, class Tm, class Tf>
+void computeLeafSourceCenterGpuNew(const Tc* x,
+                                   const Tc* y,
+                                   const Tc* z,
+                                   const Tm* m,
+                                   const TreeNodeIndex* leafToInternal,
+                                   TreeNodeIndex numLeaves,
+                                   const LocalIndex* layout,
+                                   Vec4<Tf>* centers)
+{
+    auto points  = thrust::make_zip_iterator(x, y, z, m);
+    auto sources = thrust::make_transform_iterator(points, BodyToSourceCenter<Tc, Tm, Tf>{});
+
+    auto centerScatter     = thrust::make_permutation_iterator(centers, leafToInternal);
+    auto centerScatterNorm = thrust::transform_output_iterator(centerScatter, NormMass<Tf>{});
+
+    void* d_temp_storage      = nullptr;
+    size_t temp_storage_bytes = 0;
+    cub::DeviceSegmentedReduce::Reduce(d_temp_storage, temp_storage_bytes, sources, centerScatterNorm, numLeaves,
+                                       layout, layout + 1, thrust::plus<Vec4<Tf>>{}, Vec4<Tf>{});
+
+    thrust::device_vector<std::uint8_t> temp_storage(temp_storage_bytes);
+    d_temp_storage = thrust::raw_pointer_cast(temp_storage.data());
+
+    cub::DeviceSegmentedReduce::Reduce(d_temp_storage, temp_storage_bytes, sources, centerScatterNorm, numLeaves,
+                                       layout, layout + 1, thrust::plus<Vec4<Tf>>{}, Vec4<Tf>{});
+}
+
+#define COMPUTE_LEAF_SOURCE_CENTER_GPU_NEW(Tc, Tm, Tf)                                                                 \
+    template void computeLeafSourceCenterGpuNew(const Tc*, const Tc*, const Tc*, const Tm*, const TreeNodeIndex*,      \
+                                                TreeNodeIndex, const LocalIndex*, Vec4<Tf>*);
+
+COMPUTE_LEAF_SOURCE_CENTER_GPU_NEW(double, double, double);
+COMPUTE_LEAF_SOURCE_CENTER_GPU_NEW(double, float, double);
+COMPUTE_LEAF_SOURCE_CENTER_GPU_NEW(float, float, float);
 
 template<class T>
 __global__ void upsweepCentersKernel(TreeNodeIndex firstCell,

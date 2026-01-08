@@ -67,6 +67,15 @@ extern void computeLeafSourceCenterGpu(const Tc* x,
                                        TreeNodeIndex numLeaves,
                                        const LocalIndex* layout,
                                        Vec4<Tf>* centers);
+template<class Tc, class Tm, class Tf>
+extern void computeLeafSourceCenterGpuNew(const Tc* x,
+                                          const Tc* y,
+                                          const Tc* z,
+                                          const Tm* m,
+                                          const TreeNodeIndex* leafToInternal,
+                                          TreeNodeIndex numLeaves,
+                                          const LocalIndex* layout,
+                                          Vec4<Tf>* centers);
 
 /*! @brief compute center of gravity for internal nodes with an upsweep
  *

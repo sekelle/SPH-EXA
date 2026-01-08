@@ -10,6 +10,7 @@ set(UNIT_TEST_SOURCES_GPU
         primitives/primitives_gpu.cu
         primitives/warpscan.cu
         focus/inject.cu
+        focus/source_center.cu
         sfc/common.cu
         traversal/groups.cu
         traversal/macs.cu
