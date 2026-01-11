@@ -173,6 +173,55 @@ __device__ __forceinline__ unsigned compressedNeighborsSize(const char* const in
     return *((const unsigned*)input) & 0xffff;
 }
 
+/*! @brief Extract up to 32-bit from a bitstream represented as 32 bit integers per lane
+ *
+ * @param bitstream  a bitstream of length GpuConfig::warpSize x 32 bits = 1024/2048 bits, each lane holds 32 bits
+ * @param firstBit   bit index in range [0:1024/2048] to start extraction
+ * @param lastBit    bit index in range [0:1024/2048] to extract up to (exclusive)
+ * @return           bitstream[firstBit:lastBit] as 32-bit integer
+ */
+__device__ __forceinline__ unsigned extractFromBitstream(unsigned bitstream, unsigned firstBit, unsigned lastBit)
+{
+    constexpr unsigned bitsPerLane = CHAR_BIT * sizeof(unsigned);
+    assert(firstBit <= lastBit && lastBit <= GpuConfig::warpSize * bitsPerLane);
+
+    unsigned lane1             = firstBit / bitsPerLane;
+    unsigned data1             = shflSync(bitstream, lane1);
+    unsigned lane1numValidBits = std::min(lastBit, bitsPerLane * (lane1 + 1)) - firstBit;
+    unsigned lane1validMask    = (1u << lane1numValidBits) - 1;
+    unsigned lane1contrib      = (data1 >> (firstBit % bitsPerLane)) & lane1validMask;
+
+    unsigned lane2             = lastBit > 0 ? (lastBit - 1) / bitsPerLane : 0;
+    unsigned data2             = shflSync(bitstream, lane2);
+    unsigned lane2numValidBits = lane2 > lane1 ? lastBit - lane2 * bitsPerLane : 0;
+    unsigned lane2validMask    = (1u << lane2numValidBits) - 1;
+    unsigned lane2contrib      = (data2 & lane2validMask) << lane1numValidBits;
+
+    return lane1contrib |= lane2contrib;
+}
+
+/*! @brief Load @p warpNumNb 4-bit nibbles starting from data + 4-bit * nbStartIdx into 32-bit integers
+ *
+ * @param data
+ * @param nbStartIdx  offset in nibbles relative to @p data to start reading from
+ * @param warpNumNb   total number of nibbles in warp to read from stream
+ * @return            stream data read from memory and number of extra nibbles read at stream start for alignment
+ */
+__device__ __forceinline__ std::tuple<unsigned, unsigned>
+loadBitStream(const void* data, unsigned nbStartIdx, unsigned warpNumNb)
+{
+    const unsigned laneIdx = laneIndex();
+    const unsigned stream32BitStartIdx    = nbStartIdx / 8; // round down to 4-byte multiple
+    const unsigned streamNbOffset         = nbStartIdx % 8;
+    const unsigned streamNum32BitSegments = (warpNumNb + streamNbOffset + 7) / 8; // round up to multiples of 8
+
+    unsigned streamData = 0;
+    if (laneIdx < streamNum32BitSegments)
+        streamData = reinterpret_cast<const unsigned*>(data)[stream32BitStartIdx + laneIdx];
+
+    return {streamData, streamNbOffset};
+}
+
 /*! decompress a list of neighbor indices which was compressed using warpCompressNeighbors with a single warp
  *
  * The function reads the compressed neighbor list from the input buffer and reconstructs
@@ -243,23 +292,28 @@ warpDecompressNeighbors(const char* const __restrict__ input, std::uint32_t* con
         const auto nonOneBits = nonOnes[offset / GpuConfig::warpSize];
         const bool nonOne     = (nonOneBits >> laneIdx) & 1;
 
+        // nibble info section -> number of data nibbles or immediate value, max = warpSize nibbles (16 bytes)
         const unsigned nNibbleIndex = dataSize + popCount(nonOneBits & lanemask_lt());
         dataSize += popCount(nonOneBits);
 
-        const unsigned nNibblesData  = nonOne ? readDataNibble(nNibbleIndex) : 0;
+        // read nibble info
+        const unsigned nNibblesData  = nonOne ? readDataNibble(nNibbleIndex) : 0; // info nibble value
         const bool additionalStorage = nonOne ? nNibblesData <= 7 : 0;
-        const unsigned nNibbles      = additionalStorage ? nNibblesData + 1 : 0;
+        const unsigned nNibbles      = additionalStorage ? nNibblesData + 1 : 0; // max nNibbles is 8
 
+        // nibble data section
         const unsigned nbValueScan      = inclusiveScanInt(nNibbles);
-        const unsigned nbValueDataIndex = dataSize + nbValueScan - nNibbles;
-        const unsigned nbValueSize      = shflSync(nbValueScan, GpuConfig::warpSize - 1);
-        dataSize += nbValueSize;
+        const unsigned nbValueDataIndex = nbValueScan - nNibbles;                         // convert to exclusive scan
+        const unsigned nbValueSize      = shflSync(nbValueScan, GpuConfig::warpSize - 1); // warpSum of nNibbles
 
         previous = shflSync(previous, GpuConfig::warpSize - 1);
 
-        unsigned diff = nonOne ? (additionalStorage ? readDataNibble(nbValueDataIndex) : nNibblesData - 6) : 1;
-        for (unsigned i = 1; i < nNibbles; ++i)
-            diff |= readDataNibble(nbValueDataIndex + i) << (4 * i);
+        const auto [streamData, nbAlign] = loadBitStream(data, dataSize, nbValueSize);
+        const auto streamBitStart        = 4 * (nbValueDataIndex + nbAlign);
+        const auto streamBitEnd          = 4 * (nbValueDataIndex + nbAlign + nNibbles);
+        const auto streamExtract         = extractFromBitstream(streamData, streamBitStart, streamBitEnd);
+        unsigned diff                    = nonOne ? (additionalStorage ? streamExtract : nNibblesData - 6) : 1;
+        dataSize += nbValueSize;
 
         previous += inclusiveScanInt(diff);
         const unsigned nb = offset + laneIdx;

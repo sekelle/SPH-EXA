@@ -119,3 +119,34 @@ TEST(CompressNeighborsGpu, large)
     ASSERT_EQ(output_nb_count[0], nbs.size());
     EXPECT_EQ(roundtripped, nbs);
 }
+
+__global__ void testStreamLoadKernel(const unsigned* bitstream, const uint2* bitranges, unsigned* result)
+{
+    unsigned i = threadIdx.x;
+
+    auto sel = bitranges[i];
+    result[i] = extractFromBitstream(bitstream[i], sel.x, sel.y);
+}
+
+TEST(CompressNeighborsGpu, streamload)
+{
+    thrust::device_vector<unsigned> bitstream(GpuConfig::warpSize);
+    bitstream[1] = 0x98ABCDEF; // bitstream[32:64]
+    bitstream[2] = 0x12345678; // bitstream[64:96]
+    bitstream[3] = 0x21425364; // bitstream[96:128]
+
+    thrust::device_vector<uint2> bitranges(GpuConfig::warpSize);
+    bitranges[0] = {40, 72};
+    bitranges[1] = {100, 104}; // 2nd nibble (bits 4-8) from lane 3
+    bitranges[2] = {80, 80};
+    bitranges[3] = {0, 0};
+
+    thrust::device_vector<unsigned> result(GpuConfig::warpSize);
+
+    testStreamLoadKernel<<<1,GpuConfig::warpSize>>>(rawPtr(bitstream), rawPtr(bitranges), rawPtr(result));
+
+    EXPECT_EQ(result[0], 0x7898ABCD);
+    EXPECT_EQ(result[1], 0x6);
+    EXPECT_EQ(result[2], 0);
+    EXPECT_EQ(result[3], 0);
+}
