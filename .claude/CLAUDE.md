@@ -74,7 +74,13 @@ Read `.claude/roles/[role].md`. Apply its constraints.
 
 ## Entry point
 
-**Particle species implementation** (current branch): `design.md` describes adding particle types (dark matter, gas) to SPH-EXA. Key changes: splitting ParticlesData, new type field, new propagator `HydroDarkProp`, dual particle ordering (SFC key, then type+key). Enter via FEATURE mode with implementer role.
+**Particle species implementation** (current branch): `design.md` describes adding particle types
+(DM=0, gas=1) to SPH-EXA in 5 phases: (1) add type field, (2) split ParticlesData into
+basic fields + SPH fields via SimulationData composition, (3) global stable partition by type
+(Order-1 ↔ Order-2) with gas-only layout + gas-only halo exchange, (4) new `HydroDarkProp`
+propagator with two-pass neighbor search and gravity-first timestep cycle, (5) mixed initial
+conditions with type column. Specs in `specs/` with 62 GTest scenarios across 5 phases.
+Enter via FEATURE mode with implementer role.
 
 ## Modules
 
